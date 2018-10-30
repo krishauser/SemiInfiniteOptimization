@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<world>
+  <robot name="tx90ball" file="../../../Klampt/data/robots/ARC.rob" />
+  <terrain file="../../../Klampt/data/terrains/block.off" />
+
+  <rigidObject name="chair" position="0.6 0.25 0" >
+    <geometry mesh="m797.off" rotateX="1.57" scale="1" /> 
+  </rigidObject> 
+
+</world>
