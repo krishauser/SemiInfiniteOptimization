@@ -1,17 +1,20 @@
 # SemiInfiniteOptimization
 
 Kris Hauser
+
 10/30/2018
+
 kris.hauser@duke.edu
 
 
-Code accompanying the paper "Semi-Infinite Programming for Trajectory Optimization with Nonconvex Obstacles" by K. Hauser,
-in Workshop on the Algorithmic Foundations of Robotics (WAFR), 2018.
+Code accompanying the paper
+"[Semi-Infinite Programming for Trajectory Optimization with Nonconvex Obstacles](http://motion.pratt.duke.edu/papers/WAFR2018-Hauser-SemiInfinite.pdf)"
+by K. Hauser, in Workshop on the Algorithmic Foundations of Robotics (WAFR), 2018.
 
 
 ## File structure
 
-```bash
+```
 ├── data                      World, robot, and object files for running the example code
 |   └─── ...
 ├── geomopt.py                A geometry - geometry collision optimization example program
@@ -34,11 +37,11 @@ This package requires
 1. Numpy/Scipy
 
 2. [OSQP](http://osqp.org) for quadratic program (QP) solving.  OSQP can be
-installed using
+   installed using
 
 > pip install osqp
 
-Other solvers might be supported in the future.
+   Other solvers might be supported in the future.
 
 3. The [Klampt](https://klampt.org) Python API (https://klampt.org) to be installed. 
 You will need to switch to the `logging_devel` branch of Klampt after the first `git clone` step,
