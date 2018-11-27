@@ -189,6 +189,8 @@ if SKIP_OPTIMIZATION:
 else:
     trajsolved,trace,params = geometryopt.optimizeCollFreeTrajectory(trajcache,trajinit,env=obstaclegeoms,constraints=[ctest2],greedyStart=False,verbose=1)
     #play_with_trajectory(trajsolved,[3])
+    resource.setDirectory("output")
+    print "Saving to output/robottrajopt_solved.path"
     resource.set("robottrajopt_solved.path",trajsolved)
 
 if PLOT_CSV_DISTANCES:
