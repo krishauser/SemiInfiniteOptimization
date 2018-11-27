@@ -326,7 +326,7 @@ class RobotTrajectoryCache:
         k = itimeend
         for i in xrange(m):
             assert k+n <= len(x)
-            milestones.append(x[k:k+n])
+            milestones.append(list(x[k:k+n]))
             k += n
         assert k == len(x)
         if hasattr(self.times,'__iter__'):
@@ -367,7 +367,7 @@ class RobotTrajectoryCache:
 
 
 class ObjectPoseObjective(ObjectiveFunctionInterface):
-    def __init__(self,Tdes,weight=1.0,rotationWeight=0.0):
+    def __init__(self,Tdes,weight=1.0,rotationWeight=1.0):
         self.Tdes = Tdes
         self.weight = weight
         self.rotationWeight = rotationWeight
@@ -1006,16 +1006,17 @@ def makeCollisionConstraints(obj,envs,gridres=0,pcres=0):
         
 
 
-def optimizeCollFree(obj,env,Tinit,Tdes=None,verbose=1):
+def optimizeCollFree(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
     """Uses the optimizeSemiInfinite function to optimize the transform of object obj in environment env
     so it is collision-free.
 
     Parameters:
     - obj: the Klamp't RigidObjectModel or Geometry3D for the object
-    - env: the Klamp't RigidObjectModel, TerrainModel, or Geometry3D for the object
+    - env: the Klamp't RigidObjectModel, TerrainModel, or Geometry3D for the static object
     - Tinit: the initial Klamp't se3 transform of the object
     - Tdes: the desired Klamp't se3 transform of the object.  If None, uses Tinit as the goal
     - verbose: describes how much output you want to see
+    - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
 
     Returns a tuple T,trace,constraintPts.
     """
@@ -1026,18 +1027,19 @@ def optimizeCollFree(obj,env,Tinit,Tdes=None,verbose=1):
         constraint = ObjectConvexCollisionConstraint(obj,env)
     else:
         constraint = ObjectCollisionConstraint(obj,env)
-    res = optimizeSemiInfinite(objective,[constraint],Tinit,verbose=verbose)
+    res = optimizeSemiInfinite(objective,[constraint],Tinit,verbose=verbose,settings=settings)
     return res.x,res.trace,res.instantiated_params[0]
 
-def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,verbose=1):
+def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
     """Uses the generic optimize function and a minimum constraint adaptor
 
     Parameters:
     - obj: the Klamp't RigidObjectModel or Geometry3D for the object
-    - env: the Klamp't RigidObjectModel, TerrainModel, or Geometry3D for the object
+    - env: the Klamp't RigidObjectModel, TerrainModel, or Geometry3D for the static object
     - Tinit: the initial Klamp't se3 transform of the object
     - Tdes: the desired Klamp't se3 transform of the object.  If None, uses Tinit as the goal
-    - verbose: describes how much output you want to see
+    - verbose: controls how much output you want to see
+    - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
 
     Returns a tuple T,trace,constraintPts.  (here constraintPts is empty, but is given anyway 
         to be compatible with optimizeCollFree)
@@ -1047,15 +1049,30 @@ def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,verbose=1):
     objective = ObjectPoseObjective(Tdes)
     semi_inf_constraint = ObjectCollisionConstraint(obj,env)
     constraint = MinimumConstraintAdaptor(semi_inf_constraint)
-    res = optimizeStandard(objective,[constraint],Tinit,verbose=verbose)
+    res = optimizeStandard(objective,[constraint],Tinit,verbose=verbose,settings=settings)
     return res.x,res.trace,[[]]
 
 
-def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,verbose=1):
-    """Returns a tuple q,trace,constraintPts.
+def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,verbose=1,settings=None):
     """
-    settings = SemiInfiniteOptimizationSettings()
-    settings.minimum_constraint_value = -0.02
+
+    Parameters:
+    - robot: the Klamp't RobotModel
+    - env: a Klamp't RigidObjectModel, TerrainModel, or Geometry3D for the static object.  Can also be
+      a list of static objects.
+    - qdes: the desired configuration of the robot.  Can be None, in which case the initial configuration
+      is used.  None is not compatible with qinit = 'random' or 'random-collision-free'
+    - qinit: the initial configuration of the robot.  Can be a list, None, 'random', or 'random-collision-free'
+    - constraints: if None, the constraints are created using makeCollisionConstraints(robot,env).  If you want
+      to save some overhead over multiple calls, create the constraints yourself and pass them in here.
+    - verbose: controls how much output you want to see
+    - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+
+    Returns a tuple (q,trace,constraintPts).
+    """
+    if settings is None:
+        settings = SemiInfiniteOptimizationSettings()
+        settings.minimum_constraint_value = -0.02
     if constraints is None:
         constraints,pairs = makeCollisionConstraints(robot,env)
     qmin,qmax = robot.getJointLimits()
@@ -1116,23 +1133,27 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,verbos
     res = optimizeSemiInfinite(objective,constraints,qinit,qmin,qmax,verbose=verbose,settings=settings)
     return res.x,res.trace,res.instantiated_params
 
-def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=False,verbose=1):
+def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=False,verbose=1,settings=None):
     """
     Optimizes a trajectory subject to collision-free constraints.
 
     Parameters:
     - trajcache: a RobotTrajectoryCache object dictating the form of the trajectory
     - traj0: an initial Trajectory or state
-    - env: can be a RigidObject, TerrainModel, or geometry.  It can also be a list of those.
+    - env: can be a RigidObject, TerrainModel, or geometry describing the static object.  It can also be a list of
+      static objects.
     - constraints: if given, a list of constraints that overrides the default (collision free constraints
       between all robot links and environment objects).
     - greedyStart: if True, generates a new initial trajectory that tries to follow traj0 but obeys collision
       constraints.  This is done pointwise.
+    - verbose: controls how much output you want to see
+    - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
 
     Returns a tuple traj,traj_trace,constraintPts.
     """
-    settings = SemiInfiniteOptimizationSettings()
-    settings.minimum_constraint_value = -0.02
+    if settings is None:
+        settings = SemiInfiniteOptimizationSettings()
+        settings.minimum_constraint_value = -0.02
     robot = trajcache.robot
     qmin,qmax = robot.getJointLimits()
     qmin = np.asarray(qmin)

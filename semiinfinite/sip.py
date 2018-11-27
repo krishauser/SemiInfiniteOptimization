@@ -12,6 +12,7 @@ try:
     OSQP_ENABLED = True
 except ImportError:
     OSQP_ENABLED = False
+    raise NotImplementedError("OSQP is currently required.  TODO: implement other solvers.")
 
 DEBUG_GRADIENTS = False
 DEBUG_TRAJECTORY_INITIALIZATION = False
@@ -36,6 +37,37 @@ SCORING_METRIC = 'minimum'
 INCLUDED_CONSTRAINTS = 'all'
 INCLUDED_CONSTRAINT_PARAMETERS = 'all'          #include all possible constraint parameters
 #INCLUDED_CONSTRAINT_PARAMETERS = 'deepest'       #testing: only include deepest constraint parameter
+
+class SemiInfiniteOptimizationSettings:
+    """Settings for the semi-infinite programming solver.
+
+    Attributes:
+    - max_iters: the maximum number of outer iterations (default 50)
+    - xepsilon: terminate with success if the x variable does not change more than this amount
+      between iterations (default 1e-4)
+    - constraint_inflation: the constraints will be inflated by this amount to help get a feasible solution
+    - constraint_drop_value: drop constraints from the index set when their values exceed this value
+    - minimum_constraint_value: add a hard constraint to prevent the optimizer from reaching any state in
+      which the constraint function is below this value (useful for preventing local minima in deep penetrations)
+    - initial_objective_score_weight: initial weight of the objective function in the merit function
+    - minimum_objective_score_weight: lower bound on the weight of the objective function in the merit function
+    - parameter_exclusion_distance: a new index parameter will not be added if it is within this distance of a
+      previously instantiated parameter.
+    - qp_solver_params: dictionary of any parameters used in the QP solver.  Right now, only 'regularizationFactor'
+      is used.
+    """
+    def __init__(self):
+        self.max_iters = 50
+        self.xepsilon = 1e-4
+        self.constraint_inflation = 1e-3
+        self.constraint_drop_value = 0.1 
+        #self.constraint_drop_value = float('inf')  #set this to infinity to never drop constraints
+        self.minimum_constraint_value = -float('inf')
+        self.initial_objective_score_weight = 1e-1
+        self.minimum_objective_score_weight = 1e-5
+        self.parameter_exclusion_distance = 1e-3
+        self.qp_solver_params = {'regularizationFactor':1e-3}
+
 
 
 def numeric_gradient(f,x,h=1e-4,method='centered'):
@@ -699,19 +731,6 @@ class ConstraintGenerationData:
         #print "Custom solve predicted residuals",A.dot(x)+b
         return x
 
-class SemiInfiniteOptimizationSettings:
-    """Configuration of the semi-infinite programming solver"""
-    def __init__(self):
-        self.max_iters = 50
-        self.xepsilon = 1e-4
-        self.constraint_inflation = 1e-3
-        self.constraint_drop_value = 0.1  #drop constraints that exceed this value
-        #self.constraint_drop_value = float('inf')  #drop constraints that exceed this value
-        self.minimum_constraint_value = -float('inf')
-        self.initial_objective_score_weight = 1e-1
-        self.minimum_objective_score_weight = 1e-5
-        self.parameter_exclusion_distance = 1e-3
-        self.qp_solver_params = {'regularizationFactor':1e-3}
 
 def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=None,verbose=1):
     """Optimizes a standard NLP using the same framework as the SIP solver"""

@@ -7,7 +7,9 @@ import numpy as np
 import sys
 import time
 from semiinfinite.geometryopt import *
+from semiinfinite.sip import SemiInfiniteOptimizationSettings
 
+#you can play with these parameters
 gridres = 0.05
 pcres = 0.02
 
@@ -15,20 +17,27 @@ if len(sys.argv) > 1:
     fn = sys.argv[1]
     resource.setDirectory('.')
     obj = resource.get(fn,'Geometry3D')
+
+    if len(sys.argv) > 2:
+        fn2 = sys.argv[2]
+        obj2 = resource.get(fn2,'Geometry3D')
+    else:
+        obj2 = obj.clone()
 else:
     res = resource.load('Geometry3D')
     if res is not None:
         fn,obj = res
     else:
         exit(1)
-
+    print "Cloning object for second object"
+    obj2 = obj.clone()
 
 if obj is None:
     exit(1)
 
 print "Input object has type",obj.type(),"with",obj.numElements(),"elements"
 geom1 = PenetrationDepthGeometry(obj,gridres,pcres)
-geom2 = PenetrationDepthGeometry(obj.clone(),gridres,pcres)
+geom2 = PenetrationDepthGeometry(obj2,gridres,pcres)
         
 geom2.setTransform((so3.identity(),[1.2,0,0]))
 vis.add("obj1",geom1.grid)
@@ -36,7 +45,6 @@ vis.add("obj2",geom2.pc)
 vis.setColor("obj1",1,1,0,0.5)
 vis.setColor("obj2",0,1,1,0.5)
 vis.setAttribute("obj2","size",3)
-
 
 vis.addPlot("timing")
 
