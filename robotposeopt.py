@@ -7,6 +7,7 @@ import numpy as np
 import sys
 import time
 from semiinfinite import geometryopt
+from semiinfinite.sip import SemiInfiniteOptimizationSettings
 
 gridres = 0.02
 pcres = 0.02
@@ -56,12 +57,6 @@ for i in xrange(world.numRigidObjects()):
     vis.edit(("world",world.rigidObject(i).getName()))
     movableObjects.append(("world",world.rigidObject(i).getName()))
 
-#define target
-q0 = robot.getConfig()
-res = resource.edit("Goal config",q0,'Config',world=world)
-if res[0]:
-    q0 = res[1]
-
 #extract geometries from constraints
 linkgeoms = [None]*robot.numLinks()
 obstaclegeoms = [None]*len(obstacles)
@@ -81,9 +76,11 @@ if DUMP_SDF:
         print "Saving SDF to",fn
         geometryopt.dump_grid_mat(linkgeoms[i].grid,fn)
 
-qinit = q0
-vis.add("qdes",q0)
-vis.setColor("qdes",1,0,0,0.3)
+qinit = robot.getConfig()
+vis.add("qsoln",qinit)
+vis.setColor("qsoln",0,1,0,0.5)
+#edit configuration as target
+vis.edit(("world",robot.getName()))
 
 #should we draw?
 if DRAW_GRID_AND_PC:
@@ -99,6 +96,12 @@ if DRAW_GRID_AND_PC:
         vis.setColor("envpc "+str(i),1,1,0,0.5)
         vis.hideLabel("envpc "+str(i))
 
+settings = None
+settings = SemiInfiniteOptimizationSettings()
+#if you use qinit = random-collision-free, you'll want to set this higher
+settings.max_iters = 5
+settings.minimum_constraint_value = -0.02
+
 vis.addPlot("timing")
 
 vis.show()
@@ -112,22 +115,30 @@ while vis.shown():
         for c,p in zip(constraints,pairs):
             if p[1].getName() == path[1]:
                 c.env.setTransform(T)
+    q0 = robot.getConfig()
     robot.setConfig(qinit)
-    qcollfree,trace,cps = geometryopt.optimizeCollFreeRobot(robot,obstacles,constraints=constraints,qinit='random-collision-free',qdes=q0,verbose=VERBOSE)
+    #qcollfree,trace,cps = geometryopt.optimizeCollFreeRobot(robot,obstacles,constraints=constraints,qinit='random-collision-free',qdes=q0,verbose=VERBOSE,settings=settings)
+    qcollfree,trace,cps = geometryopt.optimizeCollFreeRobot(robot,obstacles,constraints=constraints,qinit=None,qdes=q0,verbose=VERBOSE,settings=settings)
+
+    #vis.add("transformTrace",trace)
+    assert len(qcollfree) == robot.numLinks()
+    #robot.setConfig(qcollfree)
+    vis.setItemConfig("qsoln",qcollfree)
+
     if geometryopt.TEST_PYCCD:
         gx = [c(qcollfree) for c in constraints]
     else:
         gx = [c.eval_minimum(qcollfree) for c in constraints]
     feasible = all([v >= 0 for v in gx])
     if feasible:
-        vis.setColor(("world",robot.getName()),0.5,0.5,0.5)
+        vis.setColor("qsoln",0,1,0,0.5)
     else:
-        vis.setColor(("world",robot.getName()),1,0,0)
+        vis.setColor("qsoln",1,0,0,0.5)
 
-    #vis.add("transformTrace",trace)
-    assert len(qcollfree) == robot.numLinks()
-    robot.setConfig(qcollfree)
+    #initialize the next step from the last solved configuration
+    qinit = qcollfree
     """
+    #debug printing
     for c in constraints:
         c.setx(qcollfree)
     distances = [c.minvalue(qcollfree) for c in constraints]

@@ -120,7 +120,6 @@ Robot pose optimization testing:
 
 Trajectory optimization testing
 
-> mkdir output
 > python robottrajopt.py data/tx90_geom_test3.xml
 
 The example files in data/*.xml assume the Klampt folder is two levels up from this folder.  If your Klampt
