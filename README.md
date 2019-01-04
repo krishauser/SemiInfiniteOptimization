@@ -43,10 +43,7 @@ This package requires
 
    Other solvers might be supported in the future.
 
-3. The [Klampt](https://klampt.org) Python API (https://klampt.org) to be installed. 
-You will need to switch to the `logging_devel` branch of Klampt after the first `git clone` step,
-and then switch to the `logging_devel` branch in `Klampt/Cpp/Dependencies/KrisLibrary` after the
-`make unpack-deps` step.
+3. The [Klampt](https://klampt.org) 0.8.x Python API (https://klampt.org) to be installed.  `pip install klampt` may work.
 
 
 ## Basic usage:
