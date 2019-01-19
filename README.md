@@ -12,11 +12,11 @@ This package contains code accompanying the paper
 by K. Hauser, in Workshop on the Algorithmic Foundations of Robotics (WAFR), 2018.
 
 
-~[Animation of live optimization of a trajectory with a tree obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_tree.gif)
+![Animation of live optimization of a trajectory with a tree obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_tree.gif)
 
-~[Animation of live optimization of a trajectory with a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_chair.gif)
+![Animation of live optimization of a trajectory with a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_chair.gif)
 
-~[Real-time optimization of a robot pose in the presence of a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/moving_chair.gif)
+![Real-time optimization of a robot pose in the presence of a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/moving_chair.gif)
 
 
 ## File structure
