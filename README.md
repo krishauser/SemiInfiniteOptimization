@@ -1,15 +1,22 @@
 # SemiInfiniteOptimization
 
-Kris Hauser
+### Kris Hauser
 
-10/30/2018
+### 10/30/2018
 
-kris.hauser@duke.edu
+### kris.hauser@duke.edu
 
 
-Code accompanying the paper
+This package contains code accompanying the paper
 "[Semi-Infinite Programming for Trajectory Optimization with Nonconvex Obstacles](http://motion.pratt.duke.edu/papers/WAFR2018-Hauser-SemiInfinite.pdf)"
 by K. Hauser, in Workshop on the Algorithmic Foundations of Robotics (WAFR), 2018.
+
+
+~[Animation of live optimization of a trajectory with a tree obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_tree.gif)
+
+~[Animation of live optimization of a trajectory with a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_chair.gif)
+
+~[Real-time optimization of a robot pose in the presence of a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/moving_chair.gif)
 
 
 ## File structure
