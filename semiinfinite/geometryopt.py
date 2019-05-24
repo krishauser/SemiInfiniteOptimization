@@ -211,7 +211,7 @@ class RobotTrajectoryCache:
     - robot: the RobotModel
     - kinematics: the RobotKinematicsCache
     - numPoints: the number of milestones in the vector. The number of milestones in the Trajectory
-      is numPoints, numPoints+1 (one endpoint constrained), or numPoints (two endpoints constrained).
+      is numPoints, numPoints+1 (one endpoint constrained), or numPoints+1 (two endpoints constrained).
     - times: either False, True, or a list of times.  If False, the RobotTrajectory is
       assumed untimed.  If True, the vector is assumed to carry the numPoints times
       corresponding to the milestones.
@@ -367,6 +367,13 @@ class RobotTrajectoryCache:
 
 
 class ObjectPoseObjective(ObjectiveFunctionInterface):
+    """An objective function that measures the difference between a pose T and a desired
+    pose Tdes. 
+
+    f(T) = weight*||T.t - Tdes.t||^2 + rotationWeight*eR(T.R,Tdes.R)^2
+
+    where eR is the absolute rotation distance.
+    """
     def __init__(self,Tdes,weight=1.0,rotationWeight=1.0):
         self.Tdes = Tdes
         self.weight = weight
@@ -1006,7 +1013,9 @@ def makeCollisionConstraints(obj,envs,gridres=0,pcres=0):
         
 
 
-def optimizeCollFree(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
+def optimizeCollFree(obj,env,Tinit,Tdes=None,
+    verbose=1,settings=None,
+    want_trace=True,want_times=True,want_constraints=True):
     """Uses the optimizeSemiInfinite function to optimize the transform of object obj in environment env
     so it is collision-free.
 
@@ -1017,8 +1026,15 @@ def optimizeCollFree(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
     - Tdes: the desired Klamp't se3 transform of the object.  If None, uses Tinit as the goal
     - verbose: describes how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - want_trace,want_times,want_constraints: set to True if you want to return the
+      trace, times, and/or constraints (see below)
 
-    Returns a tuple T,trace,constraintPts.
+    Returns:
+        If want_trace, want_times, and want_constraints are all false, returns the resulting pose T.
+        Otherwise, returns a tuple (T,...) optionally containing:
+        - trace: the list of transforms at each major iteration
+        - times: the list of major iteration times
+        - constraints: a list containing the final set of active constraint points
     """
     if Tdes is None:
         Tdes = Tinit
@@ -1028,9 +1044,22 @@ def optimizeCollFree(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
     else:
         constraint = ObjectCollisionConstraint(obj,env)
     res = optimizeSemiInfinite(objective,[constraint],Tinit,verbose=verbose,settings=settings)
-    return res.x,res.trace,res.instantiated_params[0]
 
-def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
+    #format the output
+    if not want_trace and not want_times and not want_constraint_pts:
+        return res.x
+    retlist = [res.x]
+    if want_trace:
+        retlist.append(res.trace)
+    if want_times:
+        retlist.append(res.trace_times)
+    if want_constraints:
+        retlist.append(res.instantiated_params[0])
+    return retlist
+
+def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,
+    verbose=1,settings=None,
+    want_trace=True,want_times=True,want_constraints=True):
     """Uses the generic optimize function and a minimum constraint adaptor
 
     Parameters:
@@ -1040,9 +1069,15 @@ def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
     - Tdes: the desired Klamp't se3 transform of the object.  If None, uses Tinit as the goal
     - verbose: controls how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - want_trace,want_times,want_constraints: set to True if you want to return the
+      trace, times, and/or constraints (see below)
 
-    Returns a tuple T,trace,constraintPts.  (here constraintPts is empty, but is given anyway 
-        to be compatible with optimizeCollFree)
+    Returns:
+        If want_trace, want_times, and want_constraints are all false, returns the resulting pose T.
+        Otherwise, returns a tuple (T,...) optionally containing:
+        - trace: the list of transforms at each major iteration
+        - times: the list of major iteration times
+        - constraints: an empty list, only here to be compatible with optimizeCollFree
     """
     if Tdes is None:
         Tdes = Tinit
@@ -1050,10 +1085,23 @@ def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,verbose=1,settings=None):
     semi_inf_constraint = ObjectCollisionConstraint(obj,env)
     constraint = MinimumConstraintAdaptor(semi_inf_constraint)
     res = optimizeStandard(objective,[constraint],Tinit,verbose=verbose,settings=settings)
-    return res.x,res.trace,[[]]
+
+    #format the output
+    if not want_trace and not want_times and not want_constraint_pts:
+        return res.x
+    retlist = [res.x]
+    if want_trace:
+        retlist.append(res.trace)
+    if want_times:
+        retlist.append(res.trace_times)
+    if want_constraints:
+        retlist.append([])
+    return retlist
 
 
-def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,verbose=1,settings=None):
+def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,
+    verbose=1,settings=None,
+    want_trace=True,want_times=True,want_constraints=True):
     """
 
     Parameters:
@@ -1067,8 +1115,15 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,verbos
       to save some overhead over multiple calls, create the constraints yourself and pass them in here.
     - verbose: controls how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - want_trace,want_times,want_constraints: set to True if you want to return the
+      trace, times, and/or constraints (see below)
 
-    Returns a tuple (q,trace,constraintPts).
+    Returns:
+        If want_trace, want_times, and want_constraints are all false, returns the resulting configuration q.
+        Otherwise, returns a tuple (q,...) optionally containing:
+        - trace: the list of configurations at each major iteration
+        - times: the list of major iteration times
+        - constraints: a list containing the final set of active constraint points
     """
     if settings is None:
         settings = SemiInfiniteOptimizationSettings()
@@ -1131,9 +1186,22 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,verbos
     qmin = np.asarray(qmin)
     qmax = np.asarray(qmax)
     res = optimizeSemiInfinite(objective,constraints,qinit,qmin,qmax,verbose=verbose,settings=settings)
-    return res.x,res.trace,res.instantiated_params
 
-def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=False,verbose=1,settings=None):
+    #format the output
+    if not want_trace and not want_times and not want_constraint_pts:
+        return res.x
+    retlist = [res.x]
+    if want_trace:
+        retlist.append(res.trace)
+    if want_times:
+        retlist.append(res.trace_times)
+    if want_constraints:
+        retlist.append(res.instantiated_params)
+    return retlist
+
+def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=False,
+    verbose=1,settings=None,
+    want_trace=True,want_times=True,want_constraints=True):
     """
     Optimizes a trajectory subject to collision-free constraints.
 
@@ -1148,8 +1216,15 @@ def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=
       constraints.  This is done pointwise.
     - verbose: controls how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - want_trace,want_times,want_constraints: set to True if you want to return the
+      trace, times, and/or constraints (see below)
 
-    Returns a tuple traj,traj_trace,constraintPts.
+    Returns:
+        If want_trace, want_times, and want_constraints are all false, returns the resulting Trajectory traj.
+        Otherwise, returns a tuple (traj,...) optionally containing:
+        - trace: the list of Trajectory's at each major iteration
+        - times: the list of major iteration times
+        - constraints: a list containing the final set of active constraint points
     """
     if settings is None:
         settings = SemiInfiniteOptimizationSettings()
@@ -1223,4 +1298,16 @@ def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=
                 env[i] = PenetrationDepthGeometry(e.geometry())
         constraints = [RobotTrajectoryCollisionConstraint(env,trajcache)]
     res = optimizeSemiInfinite(objective,constraints,xinit,xmin,xmax,verbose=verbose,settings=settings)
-    return trajcache.stateToTrajectory(res.x),[trajcache.stateToTrajectory(v) for v in res.trace],res.instantiated_params
+    
+    #format the output
+    traj = trajcache.stateToTrajectory(res.x)
+    if not want_trace and not want_times and not want_constraint_pts:
+        return traj
+    retlist = [traj]
+    if want_trace:
+        retlist.append([trajcache.stateToTrajectory(v) for v in res.trace])
+    if want_times:
+        retlist.append(res.trace_times)
+    if want_constraints:
+        retlist.append(res.instantiated_params)
+    return retlist
