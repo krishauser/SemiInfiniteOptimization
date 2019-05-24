@@ -344,6 +344,7 @@ class SemiInfiniteOptimizationResult:
     - gx: the solved constraint value
     - instantiated_params: the list of instantiated semi-infinite parameters
     - trace: the sequence of states
+    - trace_times: the times at which the states in trace were produced
     - num_iterations: the number of iterations
     - status: 'optimum', 'local optimum', 'not converged', or 'error'
     - time: the total time for optimization
@@ -358,6 +359,7 @@ class SemiInfiniteOptimizationResult:
         self.gx = None
         self.instantiated_params = []
         self.trace = []
+        self.trace_times = []
         self.num_iterations = 0
         self.status = 'not converged'
         self.time = 0
@@ -739,6 +741,7 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
 
     x = xinit
     res.trace = [xinit]
+    res.trace_times = [0]
     if settings is None:
         settings = SemiInfiniteOptimizationSettings()
     objScoreWeight = settings.initial_objective_score_weight
@@ -970,6 +973,7 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
                 if verbose >=1: print "  Step length %g accepted, growing trust region to %g"%(dxnorm,trust_region_size)
         x = xnext
         res.trace.append(x)
+        res.trace_times.append(time.time()-tstart)
         score_after_trace.append(snew)
         res.fx = fxnew
         res.gx = gxnew
@@ -1009,6 +1013,7 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
 
 def optimizeKlampt(objective,constraints,xinit,xmin=None,xmax=None,settings=None,verbose=1):
     """ Uses the Klamp't optimize solver to solve an NLP.  (Not used.)"""
+    tstart = time.time()
     p = optimize.OptimizationProblem()
     def df(x):
         objective.setx(x)
@@ -1033,7 +1038,9 @@ def optimizeKlampt(objective,constraints,xinit,xmin=None,xmax=None,settings=None
     res = SemiInfiniteOptimizationResult()
     res.x0 = xinit
     res.x = result
+    res.time = time.time()-tstart
     res.trace = [xinit,result]
+    res.trace_times = [0,res.time]
     return res
 
 def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,settings=None,verbose=1):
@@ -1061,6 +1068,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
 
     x = xinit
     res.trace = [xinit]
+    res.trace_times = [0]
     if settings is None:
         settings = SemiInfiniteOptimizationSettings()
     objScoreWeight = settings.initial_objective_score_weight
@@ -1404,6 +1412,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                 if verbose >=1: print "  Step length %g accepted, growing trust region to %g"%(dxnorm,trust_region_size)
         x = xnext
         res.trace.append(x)
+        res.trace_times.append(time.time()-tstart)
         score_after_trace.append(snew)
         res.fx = fxnew
         res.gx = gxnew
