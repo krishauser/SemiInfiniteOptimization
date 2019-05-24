@@ -60,7 +60,8 @@ while vis.shown():
 
     #debug optimization
     geom1.setTransform(T)
-    Tcollfree,trace,cps = optimizeCollFree(geom1,geom2,T,verbose=0)
+    Tcollfree,trace,tracetimes,cps = optimizeCollFree(geom1,geom2,T,verbose=0,
+                                            want_trace=True,want_times=True,want_constraints=True)
     traceTraj = SE3Trajectory(range(len(trace)),trace)
     vis.add("transformTrace",traceTraj)
     for i in oldcps:
