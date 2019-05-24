@@ -117,8 +117,10 @@ while vis.shown():
                 c.env.setTransform(T)
     q0 = robot.getConfig()
     robot.setConfig(qinit)
-    #qcollfree,trace,cps = geometryopt.optimizeCollFreeRobot(robot,obstacles,constraints=constraints,qinit='random-collision-free',qdes=q0,verbose=VERBOSE,settings=settings)
-    qcollfree,trace,cps = geometryopt.optimizeCollFreeRobot(robot,obstacles,constraints=constraints,qinit=None,qdes=q0,verbose=VERBOSE,settings=settings)
+    #qcollfree,trace,cps = geometryopt.optimizeCollFreeRobot(robot,obstacles,constraints=constraints,qinit='random-collision-free',qdes=q0,verbose=VERBOSE,settings=settings,
+    #                                        want_trace=True,want_times=False,want_constraints=True)
+    qcollfree,trace,cps = geometryopt.optimizeCollFreeRobot(robot,obstacles,constraints=constraints,qinit=None,qdes=q0,verbose=VERBOSE,settings=settings,
+                                            want_trace=True,want_times=False,want_constraints=True)
 
     #vis.add("transformTrace",trace)
     assert len(qcollfree) == robot.numLinks()
