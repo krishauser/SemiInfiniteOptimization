@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <world>
-  <robot name="tx90ball" file="../../../Klampt/data/robots/tx90ball.rob" />
-  <terrain file="../../../Klampt/data/terrains/block.off" />
+  <robot name="tx90ball" file="../../../Klampt-examples/data/robots/tx90ball.rob" />
+  <terrain file="../../../Klampt-examples/data/terrains/block.off" />
 
-  <rigidObject name="block" file="../../../Klampt/data/objects/block.obj"  position="0.8 0.0 0.10">
+  <rigidObject name="block" file="../../../Klampt-examples/data/objects/block.obj"  position="0.8 0.0 0.10">
   </rigidObject> 
 
 </world>
