@@ -1,3 +1,4 @@
+from __future__ import print_function,division
 from klampt import *
 from klampt.math import vectorops,so3,se3
 from klampt.model.trajectory import SE3Trajectory,RobotTrajectory
@@ -15,14 +16,19 @@ DUMP_SDF = False
 NUM_TRAJECTORY_DIVISIONS = 10
 MORE_SUBDIVISION = 6
 EDIT_ENDPOINTS = True
-EDIT_INITIAL_GUESS = True
+EDIT_INITIAL_GUESS = False
 EDIT_OPTIMIZED_TRAJECTORY = False
 SKIP_OPTIMIZATION = False
 DEBUG_CONSTRAINTS = False
 DRAW_GRID_AND_PC = False
 EDIT_OBJECT_POSE = False
 SHOW_TRAJECTORY_TRACE = False
+ANIMATE_TRAJECTORY_TRACE = True
 PLOT_CSV_DISTANCES = True
+
+#used for trajectory visualization
+END_EFFECTOR_LINK = 6
+END_EFFECTOR_LOCAL_POSITION = [0,0,0.3]
 
 #gridres = 0.1
 #pcres = 0.05
@@ -33,14 +39,12 @@ if len(sys.argv) > 1:
     for fn in sys.argv[1:]:
         world.readFile(fn)
 else:
-    res = resource.load('WorldModel')
-    if res is not None:
-        fn,world = res
-    else:
-        exit(1)
+    print("USAGE: python robottrajopt.py WORLD_MODEL")
+    print("Try python robottrajopt.py data/tx90_geom_test.xml")
+    exit(1)
 
 if world.numRobots() == 0:
-    print "Must specify a robot"
+    print("Must specify a robot")
     exit(1)
 
 robot = world.robot(0)
@@ -52,10 +56,10 @@ for i in xrange(world.numRigidObjects()):
     obstacles.append(world.rigidObject(i))
 #for i in xrange(world.numTerrains()):
 #   obstacles.append(world.terrain(i))
-print "%d robots, %d rigid objects, %d terrains"%(world.numRobots(),world.numRigidObjects(),world.numTerrains())
+print("%d robots, %d rigid objects, %d terrains"%(world.numRobots(),world.numRigidObjects(),world.numTerrains()))
 assert len(obstacles) > 0
 constraints,pairs = geometryopt.makeCollisionConstraints(robot,obstacles,gridres,pcres)
-print "Created",len(constraints),"constraints"
+print("Created",len(constraints),"constraints")
 #raw_input("Press enter to continue... ")
 
 vis.add("world",world)
@@ -67,7 +71,7 @@ trajcache = geometryopt.RobotTrajectoryCache(kinematicscache,NUM_TRAJECTORY_DIVI
 if DUMP_SDF:
     for i in xrange(robot.numLinks()):
         fn = 'output/'+ robot.link(i).getName()+'.mat'
-        print "Saving SDF to",fn
+        print("Saving SDF to",fn)
         geometryopt.dump_grid_mat(trajcache.kinematics.geometry[i].grid,fn)
 
 try:
@@ -87,8 +91,8 @@ if trajinit is None:
         ok,res = resource.edit("Trajectory endpoints",[trajcache.qstart,trajcache.qend],world=world)
         if ok:
             trajcache.qstart,trajcache.qend = res
-            print trajcache.qstart
-            print trajcache.qend
+            print(trajcache.qstart)
+            print(trajcache.qend)
     xtraj = trajcache.straightLineState()
     trajinit = trajcache.stateToTrajectory(xtraj)
 else:
@@ -101,12 +105,12 @@ else:
             for k in range(MORE_SUBDIVISION):
                 times.append(t0 + float(k)/float(MORE_SUBDIVISION)*(t1-t0))
         times.append(trajinit.times[-1])
-        print "NEW TIMES",times
+        print("NEW TIMES",times)
         trajinit = trajinit.remesh(times)[0]
-    print "Trajectory has",len(trajinit.milestones),"milestones"    
+    print("Trajectory has",len(trajinit.milestones),"milestones")
     trajcache.qstart = trajinit.milestones[0][:]
     trajcache.qend = trajinit.milestones[-1][:]
-    print "Time range",trajinit.times[0],trajinit.times[-1]
+    print("Time range",trajinit.times[0],trajinit.times[-1])
     trajcache.tstart = trajinit.times[0]
     trajcache.tend = trajinit.times[-1]
     xtraj = trajcache.trajectoryToState(trajinit)
@@ -117,7 +121,7 @@ if EDIT_INITIAL_GUESS:
     if ok:
         trajinit = res
         trajinit.times[-1] = trajcache.tend
-        print "Saving to robottrajopt_initial.path"
+        print("Saving to robottrajopt_initial.path")
         resource.set('robottrajopt_initial.path',res)
 
 obstaclegeoms = [geometryopt.PenetrationDepthGeometry(obs.geometry(),None,pcres) for obs in obstacles]
@@ -125,24 +129,24 @@ obstaclegeoms = [geometryopt.PenetrationDepthGeometry(obs.geometry(),None,pcres)
 ctest2 = geometryopt.RobotTrajectoryCollisionConstraint(obstaclegeoms,trajcache)
 
 if DEBUG_CONSTRAINTS:
-    print "Testing link 6 trajectory collision constraint"
+    print("Testing link 6 trajectory collision constraint")
     ctest = geometryopt.RobotLinkTrajectoryCollisionConstraint(robot.link(6),obstaclegeoms[0],trajcache)
     ctest.setx(xtraj)
     res = ctest.minvalue(xtraj)
-    print "(Minimum distance, minimum parameter)",res
+    print("(Minimum distance, minimum parameter)",res)
     ctest.clearx()
-    print "Testing link 4 trajectory collision constraint"
+    print("Testing link 4 trajectory collision constraint")
     ctest = geometryopt.RobotLinkTrajectoryCollisionConstraint(robot.link(4),obstaclegeoms[0],trajcache)
     ctest.setx(xtraj)
     res = ctest.minvalue(xtraj)
-    print "(Minimum distance, minimum parameter)",res
+    print("(Minimum distance, minimum parameter)",res)
     ctest.clearx()
     #raw_input("Press enter to continue... ")
-    print "Testing whole-robot trajectory collision constraint"
+    print("Testing whole-robot trajectory collision constraint")
 
     ctest2.setx(xtraj)
     res = ctest2.minvalue(xtraj)
-    print "(Minimum distance, minimum parameter)",res
+    print("(Minimum distance, minimum parameter)",res)
     ctest2.clearx()
     raw_input("Press enter to continue... ")
 
@@ -151,7 +155,7 @@ def play_with_trajectory(traj,configs=[3]):
     names = []
     for i,x in enumerate(traj.milestones):
         if i in configs:
-            print "Editing",i
+            print("Editing",i)
             names.append("milestone "+str(i))
             vis.add(names[-1],x[:])
             vis.edit(names[-1])
@@ -172,7 +176,7 @@ def play_with_trajectory(traj,configs=[3]):
             xnew = trajcache.trajectoryToState(traj)
             ctest2.setx(xnew)
             res = ctest2.minvalue(xtraj)
-            print res
+            print(res)
             ctest2.clearx()
         vis.unlock()
         t1 = time.time()
@@ -185,17 +189,52 @@ ctest2.verbose = 0
 if SKIP_OPTIMIZATION:
     trajsolved = trajinit
     trace = [trajinit]
+    times = [0]
     params = [[]]
 else:
-    trajsolved,trace,params = geometryopt.optimizeCollFreeTrajectory(trajcache,trajinit,env=obstaclegeoms,constraints=[ctest2],greedyStart=False,verbose=1)
+    trajsolved,trace,times,params = geometryopt.optimizeCollFreeTrajectory(trajcache,trajinit,env=obstaclegeoms,constraints=[ctest2],greedyStart=False,verbose=1,
+                                            want_trace=True,want_times=True,want_constraints=True)
     #play_with_trajectory(trajsolved,[3])
     resource.setDirectory("output")
-    print "Saving to output/robottrajopt_solved.path"
+    print("Saving to output/robottrajopt_solved.path")
     resource.set("robottrajopt_solved.path",trajsolved)
+
+def animate_trajectories(trajs,times,endWaitTime=5.0,speed=0.2):
+    global world
+    active = 0
+    for i in range(len(trajs)):
+        vis.add("traj"+str(i),trajs[i].getLinkTrajectory(END_EFFECTOR_LINK,0.1).getPositionTrajectory(END_EFFECTOR_LOCAL_POSITION))
+        vis.hide("traj"+str(i))
+        vis.hideLabel("traj"+str(i))
+    vis.show()
+    t0 = time.time()
+    if len(times) == 1:
+        tnext = float('inf')
+    else:
+        tnext = times[active+1]
+    while vis.shown():
+        t = time.time()
+        if t - t0 > tnext:
+            nextactive = (active + 1)%len(times)
+            vis.hide("traj"+str(active))
+            vis.hide("traj"+str(nextactive),False)
+            active = nextactive
+            if nextactive + 1 == len(times):
+                tnext += endWaitTime
+            else:
+                tnext += times[active+1] - times[active]
+        vis.lock()
+        world.robot(0).setConfig(trajs[active].eval((t - t0)*speed,endBehavior='loop'))
+        vis.unlock()
+        time.sleep(0.01)
+    print("Done.")
+
+if ANIMATE_TRAJECTORY_TRACE:
+    animate_trajectories(trace,times)
 
 if PLOT_CSV_DISTANCES:
     fn = 'output/robottrajopt_distances.csv'
-    print "Dumping pairwise distances to",fn,"..."
+    print("Dumping pairwise distances to",fn,"...")
     f = open(fn,'w')
     f.write('t')
     for obs in obstacles:
@@ -241,14 +280,14 @@ xsolved = trajcache.trajectoryToState(trajsolved)
 cps = defaultdict(list)
 for p in params[0]:
     cps[(p[0],p[1])].append(p[2:])
-print
-print "Constrained points:"
+print()
+print("Constrained points:")
 ctest2.setx(xsolved)
 for k in cps:
     cps[k] = sorted(cps[k])
-    print "  link %d env %d: "%(k[0],k[1])
+    print("  link %d env %d: "%(k[0],k[1]))
     for v in cps[k]:
-        print "     ",v,"dist",ctest2.value(xsolved,k + v)
+        print("     ",v,"dist",ctest2.value(xsolved,k + v))
 ctest2.clearx()
 #raw_input("Press enter to continue > ")
 
@@ -265,7 +304,7 @@ if EDIT_OPTIMIZED_TRAJECTORY:
 """
 xtraj = trajcache.trajectoryToState(trajsolved)
 ctest2.setx(xtraj)
-print "Resulting constraint residual",ctest2.minvalue(xtraj)
+print("Resulting constraint residual",ctest2.minvalue(xtraj))
 ctest2.clearx()
 raw_input("Press enter to continue... ")
 """
@@ -274,13 +313,12 @@ timescale = 10
 trajinit.times = [timescale*v for v in trajinit.times]
 if trajinit is not trajsolved:
     trajsolved.times = [timescale*v for v in trajsolved.times]
-eepos = [0,0,0.3]
-vis.add("Initial trajectory",trajinit.getLinkTrajectory(6,0.1).getPositionTrajectory(eepos))
+vis.add("Initial trajectory",trajinit.getLinkTrajectory(END_EFFECTOR_LINK,0.1).getPositionTrajectory(END_EFFECTOR_LOCAL_POSITION))
 #vis.add("Initial trajectory",trajinit)
 vis.setColor("Initial trajectory",1,1,0,0.5)
 vis.hideLabel("Initial trajectory")
 vis.setAttribute("Initial trajectory","width",2)
-eetrajopt = trajsolved.getLinkTrajectory(6,0.1).getPositionTrajectory(eepos)
+eetrajopt = trajsolved.getLinkTrajectory(END_EFFECTOR_LINK,0.1).getPositionTrajectory(END_EFFECTOR_LOCAL_POSITION)
 vis.add("Solution trajectory",eetrajopt)
 #vis.add("Solution trajectory",trajsolved)
 vis.hideLabel("Solution trajectory")
@@ -341,7 +379,7 @@ while vis.shown():
                 if p[1].getName() == path[1]:
                     c.env.setTransform(T)
         distances = [c.eval_minimum(qcollfree) for c in constraints]
-        print "Distances",distances
+        print("Distances",distances)
 
     for i in oldcps:
         vis.hide(i)
