@@ -1,3 +1,4 @@
+from __future__ import print_function,division
 from klampt import *
 from klampt.math import vectorops,so3,se3
 from klampt.model.trajectory import Trajectory,RobotTrajectory
@@ -58,8 +59,8 @@ class PenetrationDepthGeometry:
                 try:
                     self.grid = geom.convert('VolumeGrid',gridres)
                 except Exception as e:
-                    print "WARNING: could not convert geometry to VolumeGrid, exception",e
-                    print "May have problems performing normal and distance estimation"
+                    print("WARNING: could not convert geometry to VolumeGrid, exception",e)
+                    print("May have problems performing normal and distance estimation")
             if pcres is not None:
                 self.pc = geom.convert('PointCloud',pcres)
                 self.pcdata = self.pc.getPointCloud()
@@ -121,7 +122,7 @@ class PenetrationDepthGeometry:
                 assert self.grid is not None,"Can't compute fast distance without a signed distance field VolumeGrid / PointCloud"
                 assert self.pc is not None,"Can't compute fast distance without a signed distance field VolumeGrid / PointCloud"
                 res = self.grid.distance_ext(other.pc,settings)
-                print "Uhhh... doing grid to PC instead of the other way around?"
+                print("Uhhh... doing grid to PC instead of the other way around?")
             else:
                 res = self.pc.distance_ext(other.grid,settings)
             if bound is not None and res.d >= bound:
@@ -167,7 +168,7 @@ class PenetrationDepthGeometry:
             return vectorops.div(g,ptdist)
 
 
-class PenetrationGeometryDomain:
+class PenetrationGeometryDomain(DomainInterface):
     def __init__(self,g):
         self.g = g
     def sample(self):
@@ -235,8 +236,8 @@ class RobotTrajectoryCache:
             self.kinematics = RobotKinematicsCache(robot)
         self.numPoints = numPoints
         self.times = times
-        self.qstart = None
-        self.qend = None
+        self.qstart = qstart
+        self.qend = qend
         self.tstart = 0
         self.tend = 1
         self.trajectory = None
@@ -279,7 +280,7 @@ class RobotTrajectoryCache:
             for a in ancestors[l]:
                 self.lipschitzConstants[a,l] = radii[a,l] + Kgeom
             self.lipschitzConstants[l,l] = Kgeom
-        print "Robot lipschitz constants",self.lipschitzConstants
+        print("Robot lipschitz constants",self.lipschitzConstants)
         self.dirty = True
     def set(self,x):
         if self.dirty:
@@ -416,7 +417,7 @@ class ObjectCollisionConstraint(SemiInfiniteConstraintInterface):
         aw = vectorops.cross(cporiented,worlddir)
         return np.array(list(aw)+list(av))
     def domain(self):
-        return self.env
+        return PenetrationGeometryDomain(self.env)
 
 class ObjectConvexCollisionConstraint(ConstraintInterface):
     """Returns signed-distance(T*A,B) where x=T"""
@@ -441,6 +442,9 @@ class ObjectConvexCollisionConstraint(ConstraintInterface):
         return np.array(list(aw)+list(av))
 
 class RobotConfigObjective(ObjectiveFunctionInterface):
+    """An objective function that returns the squared distance between a configuration
+    and qdes, i.e., f(q) = weight*||q-qdes||^2.
+    """
     def __init__(self,robot,qdes,weight=1.0):
         self.robot = robot
         self.qdes = qdes
@@ -477,7 +481,7 @@ class RobotLinkCollisionConstraint(SemiInfiniteConstraintInterface):
         Jp = self.link.getPositionJacobian(localpt)
         return np.dot(np.array(Jp).T,worlddir)
     def domain(self):
-        return self.env
+        return PenetrationGeometryDomain(self.env)
 
 class RobotLinkConvexCollisionConstraint(ConstraintInterface):
     """Represents collisions between a single robot link and a single static geometry
@@ -604,24 +608,24 @@ class RobotLinkTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
             if i+1 < len(traj.milestones):
                 dbnd = min(dbnd,self.trajectory.interMilestoneLipschitzBounds[i][self.link.index])
             di = self.env.distance(geom,dmin+dbnd*0.5)[0]
-            if self.verbose >= 2: print "Distance at milestone",i,"is",di
+            if self.verbose >= 2: print("Distance at milestone",i,"is",di)
             if di < dmin:
                 dmin = di
                 tmin = traj.times[i]
             dmilestones.append(di)
-        if self.verbose >= 1: print "At milestones, minimum distance is",dmin,"at time",tmin
+        if self.verbose >= 1: print("At milestones, minimum distance is",dmin,"at time",tmin)
         epsilon = 1e-2
         edgequeue = []
         for i in xrange(len(traj.milestones)-1):
             di = dmilestones[i]
             dn = dmilestones[i+1]
             dbnd = self.trajectory.interMilestoneLipschitzBounds[i][self.link.index]
-            if self.verbose >= 2: print "Lipschitz bound on edge",i,"is",dbnd
+            if self.verbose >= 2: print("Lipschitz bound on edge",i,"is",dbnd)
             dlow = intervalLipschitzMinimum(di,dn,dbnd)
             if dlow < dmin:
                 #optimum could be in this edge range, subdivide
                 heapq.heappush(edgequeue,(dlow,(i,0,1,di,dn)))
-        if self.verbose >= 1: print "Original edge queue distances",[(info[0],info[1][0]) for info in edgequeue]
+        if self.verbose >= 1: print("Original edge queue distances",[(info[0],info[1][0]) for info in edgequeue])
         numsubdivisions = 0
         while len(edgequeue) > 0:
             dlow,(edge,u,v,du,dv) = heapq.heappop(edgequeue)
@@ -646,7 +650,7 @@ class RobotLinkTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
                 if dlow < dmin:
                     heapq.heappush(edgequeue,(dlow,(edge,midpt,v,di,dv)))
         t1 = time.time()
-        if self.verbose >= 1: print "Performed",numsubdivisions,"subdivision steps","in time",t1-t0
+        if self.verbose >= 1: print("Performed",numsubdivisions,"subdivision steps","in time",t1-t0)
         if tmin == None:
             #bound killed everything
             return []
@@ -667,7 +671,9 @@ class RobotLinkTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
         Jp = self.link.getPositionJacobian(localpt)
         return np.dot(np.array(Jp).T,worlddir)
     def domain(self):
-        return ([self.trajectory.tstart,self.trajectory.tend],self.env)
+        return CartesianProductDomain(IntervalDomain(self.trajectory.tstart,self.trajectory.tend),
+                                        PenetrationGeometryDomain(self.env))
+
 
 class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
     """Represents collisions along a trajectory between an entire robot and one or more
@@ -702,8 +708,8 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
         res = geom.distance(worldpt)
         """
         if link == 4:
-            print "Value at time",t,"link",link,"env",env,"worldpt",worldpt,"is",res[0]
-            print "  config norm",vectorops.norm(q),"traj norm",vectorops.norm(x)
+            print("Value at time",t,"link",link,"env",env,"worldpt",worldpt,"is",res[0])
+            print("  config norm",vectorops.norm(q),"traj norm",vectorops.norm(x))
         """
         self.trajectory.kinematics.clear()
         return res[0]
@@ -744,13 +750,13 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
                         qmin = traj.milestones[i]
                         envmin = j
                         linkmin = link
-        if self.verbose>=1: print "Among all milestones, minimum distance is",dmin,"on link",linkmin,"at time",tmin
+        if self.verbose>=1: print("Among all milestones, minimum distance is",dmin,"on link",linkmin,"at time",tmin)
         edgequeue = []
         for i in xrange(len(traj.milestones)-1):
             di = active_milestones[i]
             dn = active_milestones[i+1]
             dbnd = self.trajectory.interMilestoneLipschitzBounds[i]
-            #print "Lipschitz bound on edge",i,"is",dbnd
+            #print("Lipschitz bound on edge",i,"is",dbnd)
             active = dict()
             for (link,env),d in di.iteritems():
                 if (link,env) in dn:
@@ -777,13 +783,13 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
                             aenvs[env] = d
                     for link,d in enumerate(alinks):
                         if d < 1000:
-                            print "At edge",i,"link",link,"is active with distance lower bound",d
+                            print("At edge",i,"link",link,"is active with distance lower bound",d)
                     for env,d in enumerate(aenvs):
                         if d < 1000:
-                            print "At edge",i,"env",env,"is active with distance lower bound",d
+                            print("At edge",i,"env",env,"is active with distance lower bound",d)
                 heapq.heappush(edgequeue,(min(active.values()),active,(i,0,1,di,dn)))
-        #print "Original edge queue distances",[(info[0],info[2][0]) for info in edgequeue]
-        if self.verbose>=1: print "Further subdividing",len(edgequeue),"edges"
+        #print("Original edge queue distances",[(info[0],info[2][0]) for info in edgequeue]
+        if self.verbose>=1: print("Further subdividing",len(edgequeue),"edges")
         numsubdivisions = 0
         numsubdivisionchecks = 0
         while len(edgequeue) > 0:
@@ -808,7 +814,7 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
                 numsubdivisionchecks += 1
                 dij = self.envs[env].distance(geom,dmin+dbnd*duration*0.5 + distance_bound_inflation)[0]
                 if self.verbose >= 2:
-                    print "Dist %d - %d time %g: %g (bound %g)"%(link,env,t,dij,dmin+dbnd*duration*0.5 + distance_bound_inflation)
+                    print("Dist %d - %d time %g: %g (bound %g)"%(link,env,t,dij,dmin+dbnd*duration*0.5 + distance_bound_inflation))
                 linkcheckhist[link] += 1
                 envcheckhist[env] += 1
                 if dij < dmin+dbnd*duration*0.5:
@@ -845,10 +851,10 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
                     heapq.heappush(edgequeue,(min(c2.values()),c2,(edge,midpt,v,active,dv)))
         t1 = time.time()
         if self.verbose>=1: 
-            print "Performed",numsubdivisions,"subdivision steps including",numsubdivisionchecks,"collision checks in time",t1-t0
-            print "# of link checks:",linkcheckhist
-            print "# of env checks:",envcheckhist
-            print "Closest point distance",dmin,"on link",linkmin,"object",envmin,"at time",tmin
+            print("Performed",numsubdivisions,"subdivision steps including",numsubdivisionchecks,"collision checks in time",t1-t0)
+            print("# of link checks:",linkcheckhist)
+            print("# of env checks:",envcheckhist)
+            print("Closest point distance",dmin,"on link",linkmin,"object",envmin,"at time",tmin)
             """
             #TEST brute force
             dmin_bf = float('inf')
@@ -870,7 +876,7 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
                             linkmin_bf = link
                             envmin_bf = j
                 self.trajectory.kinematics.clear()
-            print "Brute force minimum distance",dmin_bf,"on link",linkmin_bf,"object",envmin_bf,"at time",tmin_bf
+            print("Brute force minimum distance",dmin_bf,"on link",linkmin_bf,"object",envmin_bf,"at time",tmin_bf)
             raw_input()
             """
         if tmin == None:
@@ -882,12 +888,12 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
         geom.setTransform(robot.link(linkmin).getTransform())
         d,cp1,cp2 = self.envs[envmin].distance(geom)
         """
-        print ".minvalue Config",qmin,"and environment point",cp1,"with local point",cp2
-        print "  Geomtransform",geom.geom.getCurrentTransform()
+        print(".minvalue Config",qmin,"and environment point",cp1,"with local point",cp2)
+        print("  Geomtransform",geom.geom.getCurrentTransform())
         d_test,cp1_test,cp2_test = geom.distance(cp1)
-        print "testing %g = %g = %g has abs value %g"%(dmin,d,d_test,vectorops.distance(cp1,cp2))
-        print "testing",cp1,"=",cp1_test
-        print "testing",cp2,"=",cp2_test
+        print("testing %g = %g = %g has abs value %g"%(dmin,d,d_test,vectorops.distance(cp1,cp2)))
+        print("testing",cp1,"=",cp1_test)
+        print("testing",cp2,"=",cp2_test)
         """
         return dmin,(linkmin,envmin,tmin)+tuple(cp1)
     def df_dx(self,x,y):
@@ -933,8 +939,10 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
         return dx
         
     def domain(self):
-        return (set(range(self.robot.numLinks())),set(range(len(self.envs))),[self.trajectory.tstart,self.trajectory.tend],self.envs)
-
+        return CartesianProductDomain(SetDomain(range(self.robot.numLinks())),
+                                        SetDomain(range(len(self.envs))),
+                                        IntervalDomain(self.trajectory.tstart,self.trajectory.tend),
+                                        UnionDomain([PenetrationGeometryDomain(e) for e in self.envs]))
 
 
 def makeCollisionConstraints(obj,envs,gridres=0,pcres=0):
@@ -944,10 +952,15 @@ def makeCollisionConstraints(obj,envs,gridres=0,pcres=0):
 
     Return value is (constraints,pairs) where constraints is the list of constraints, and pairs
     is a corresponding list of paired entities from the obj, envs arguments.
+
+    If you have a large number of robot links / objects / envs, the optimizer may be
+    faster if you put them into a single MultiSemiInfiniteConstraint.  However, during
+    debugging you will need to do more work when parsing the constraint value since it's
+    a single number rather than a vector of elements corresponding to collision pairs.
     """
     if not hasattr(envs,'__iter__'):
         envs = [envs]
-    print "Calling makeCollisionConstraints",obj.__class__.__name__
+    print("Calling makeCollisionConstraints",obj.__class__.__name__)
     envgeoms = [None]*len(envs)
     for i,e in enumerate(envs):
         if isinstance(e,PenetrationDepthGeometry):
@@ -955,10 +968,10 @@ def makeCollisionConstraints(obj,envs,gridres=0,pcres=0):
         else:
             if isinstance(e,Geometry3D):
                 envgeoms[i] = e
-                print "  Converting environment plain geometry",i
+                print("  Converting environment plain geometry",i)
             else:
                 envgeoms[i] = e.geometry()
-                print "  Converting environment item",e.getName()
+                print("  Converting environment item",e.getName())
             envgeoms[i] = PenetrationDepthGeometry(envgeoms[i],gridres,pcres)
     if isinstance(obj,RobotModel):
         #everything shares the same robot cache
@@ -1009,12 +1022,11 @@ def makeCollisionConstraints(obj,envs,gridres=0,pcres=0):
         if TEST_PYCCD:
             return [ObjectConvexCollisionConstraint(geom,e) for e in envgeoms],[(obj,e) for e in envs]
         else:
-            return [ObjectCollisionConstraint(geom,e) for e in envgeoms],[(obj,e) for e in envs]
-        
+            return [ObjectCollisionConstraint(geom,e) for e in envgeoms],[(obj,e) for e in envs]        
 
 
 def optimizeCollFree(obj,env,Tinit,Tdes=None,
-    verbose=1,settings=None,
+    settings=None,verbose=1,
     want_trace=True,want_times=True,want_constraints=True):
     """Uses the optimizeSemiInfinite function to optimize the transform of object obj in environment env
     so it is collision-free.
@@ -1024,8 +1036,8 @@ def optimizeCollFree(obj,env,Tinit,Tdes=None,
     - env: the Klamp't RigidObjectModel, TerrainModel, or Geometry3D for the static object
     - Tinit: the initial Klamp't se3 transform of the object
     - Tdes: the desired Klamp't se3 transform of the object.  If None, uses Tinit as the goal
-    - verbose: describes how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - verbose: controls how much output you want to see
     - want_trace,want_times,want_constraints: set to True if you want to return the
       trace, times, and/or constraints (see below)
 
@@ -1058,7 +1070,7 @@ def optimizeCollFree(obj,env,Tinit,Tdes=None,
     return retlist
 
 def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,
-    verbose=1,settings=None,
+    settings=None,verbose=1,
     want_trace=True,want_times=True,want_constraints=True):
     """Uses the generic optimize function and a minimum constraint adaptor
 
@@ -1067,8 +1079,8 @@ def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,
     - env: the Klamp't RigidObjectModel, TerrainModel, or Geometry3D for the static object
     - Tinit: the initial Klamp't se3 transform of the object
     - Tdes: the desired Klamp't se3 transform of the object.  If None, uses Tinit as the goal
-    - verbose: controls how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - verbose: controls how much output you want to see
     - want_trace,want_times,want_constraints: set to True if you want to return the
       trace, times, and/or constraints (see below)
 
@@ -1099,8 +1111,8 @@ def optimizeCollFreeMinDist(obj,env,Tinit,Tdes=None,
     return retlist
 
 
-def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,
-    verbose=1,settings=None,
+def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,objective=None,constraints=None,
+    settings=None,verbose=1,
     want_trace=True,want_times=True,want_constraints=True):
     """
 
@@ -1111,10 +1123,12 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,
     - qdes: the desired configuration of the robot.  Can be None, in which case the initial configuration
       is used.  None is not compatible with qinit = 'random' or 'random-collision-free'
     - qinit: the initial configuration of the robot.  Can be a list, None, 'random', or 'random-collision-free'
+    - objective: if None, the objective is to arrive at qdes.  Otherwise, an ObjectiveFunctionInterface
+      that you would like to minimize.
     - constraints: if None, the constraints are created using makeCollisionConstraints(robot,env).  If you want
       to save some overhead over multiple calls, create the constraints yourself and pass them in here.
-    - verbose: controls how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - verbose: controls how much output you want to see
     - want_trace,want_times,want_constraints: set to True if you want to return the
       trace, times, and/or constraints (see below)
 
@@ -1141,11 +1155,11 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,
         qdes = qinit
         if len(qinit) != robot.numLinks():
             raise ValueError("Invalid size of initial configuration")
-    objective = RobotConfigObjective(robot,qdes)
+    if objective is None:
+        objective = RobotConfigObjective(robot,qdes)
 
     if qinit == 'random' or qinit == 'random-collision-free':
-        #lower_bound = settings.minimum_constraint_value
-        lower_bound = 0
+        lower_bound = settings.minimum_constraint_value
         if qinit == 'random-collision-free':
             lower_bound = 0.0
         if qdes is None:
@@ -1159,7 +1173,7 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,
         for sample in xrange(maxSamples):
             rad = float(sample)/(maxSamples-1)
             for i in xrange(len(qdes)):
-                u = random.uniform(0,1)**2
+                u = (random.uniform(-1,1)**2 + 1)*0.5
                 vmin = qdes[i] + rad*(qmin[i]-qdes[i])
                 vmax = qdes[i] + rad*(qmax[i]-qdes[i])
                 qinit[i] = vmin + u*(vmax-vmin)
@@ -1178,10 +1192,10 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,
                 qbest = qinit[:]
         if not sampledFeasible:
             if verbose >= 1: 
-                print "optimizeCollFreeRobot: Could not generate an initial configuration that respects the minimum constraint value"
+                print("optimizeCollFreeRobot: Could not generate an initial configuration that respects the minimum constraint value")
             return qbest,[qbest],[[] for c in constraints]
         t1 = time.time()
-        print "Solved in time",t1-t0,"with distance to target",objective.value(qinit)
+        print("Solved in time",t1-t0,"with distance to target",objective.value(qinit))
 
     qmin = np.asarray(qmin)
     qmax = np.asarray(qmax)
@@ -1199,8 +1213,8 @@ def optimizeCollFreeRobot(robot,env,qdes=None,qinit=None,constraints=None,
         retlist.append(res.instantiated_params)
     return retlist
 
-def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=False,
-    verbose=1,settings=None,
+def optimizeCollFreeTrajectory(trajcache,traj0,env,objective=None,constraints=None,greedyStart=False,
+    settings=None,verbose=1,
     want_trace=True,want_times=True,want_constraints=True):
     """
     Optimizes a trajectory subject to collision-free constraints.
@@ -1210,12 +1224,13 @@ def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=
     - traj0: an initial Trajectory or state
     - env: can be a RigidObject, TerrainModel, or geometry describing the static object.  It can also be a list of
       static objects.
+    - objective: if given, an ObjectiveFunctionInterface that measures the trajectory cost.
     - constraints: if given, a list of constraints that overrides the default (collision free constraints
       between all robot links and environment objects).
     - greedyStart: if True, generates a new initial trajectory that tries to follow traj0 but obeys collision
       constraints.  This is done pointwise.
-    - verbose: controls how much output you want to see
     - settings: a SemiInfiniteOptimizationSettings object to customize solver settings
+    - verbose: controls how much output you want to see
     - want_trace,want_times,want_constraints: set to True if you want to return the
       trace, times, and/or constraints (see below)
 
@@ -1239,7 +1254,7 @@ def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=
         xinit = traj0
     if greedyStart:
         assert env is not None,"GreedyStart requires the environment to be given"
-        if verbose >= 1: print "Performing greedy start..."
+        if verbose >= 1: print("Performing greedy start...")
         robot = trajcache.robot
         greedyconstraints,pairs = makeCollisionConstraints(trajcache.kinematics,env)
         traj0 = trajcache.stateToTrajectory(xinit)
@@ -1248,24 +1263,24 @@ def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=
         if trajcache.qstart is None: #free start point
             qobjective = RobotConfigObjective(robot,traj0.milestones[0])
             res = optimizeSemiInfinite(qobjective,greedyconstraints,qlast,qmin,qmax,verbose=0,settings=settings)
-            if verbose >= 1: print "   Reduced start config f(x) from %g to %g"%(res.fx0,res.fx)
-            if verbose >= 1: print "   Reduced start config g(x) from",res.gx0,"to",res.gx
+            if verbose >= 1: print("   Reduced start config f(x) from %g to %g"%(res.fx0,res.fx))
+            if verbose >= 1: print("   Reduced start config g(x) from",res.gx0,"to",res.gx)
             traj0.milestones[0] = res.x
             qlast = res.x
         for i in xrange(1,len(traj0.milestones)-1):
             qobjective = RobotConfigObjective(robot,traj0.milestones[i])
-            print "  Target",i,"=",traj0.milestones[i]
+            print("  Target",i,"=",traj0.milestones[i])
             res = optimizeSemiInfinite(qobjective,greedyconstraints,qlast,qmin,qmax,verbose=0,settings=settings)
-            if verbose >= 1: print "   Reduced config",i,"f(x) from %g to %g"%(res.fx0,res.fx)
-            if verbose >= 1: print "   Reduced config",i,"g(x) from",res.gx0,"to",res.gx
-            print "  Result",i,"=",res.x
+            if verbose >= 1: print("   Reduced config",i,"f(x) from %g to %g"%(res.fx0,res.fx))
+            if verbose >= 1: print("   Reduced config",i,"g(x) from",res.gx0,"to",res.gx)
+            print("  Result",i,"=",res.x)
             traj0.milestones[i] = res.x
             qlast = res.x
         if trajcache.qend is None: #free end point
             qobjective = RobotConfigObjective(robot,traj0.milestones[-1])
             res = optimizeSemiInfinite(qobjective,greedyconstraints,qlast,qmin,qmax,verbose=0,settings=settings)
-            if verbose >= 1: print "   Reduced last config f(x) from %g to %g"%(res.fx0,res.fx)
-            if verbose >= 1: print "   Reduced last config g(x) from",res.gx0,"to",res.gx
+            if verbose >= 1: print("   Reduced last config f(x) from %g to %g"%(res.fx0,res.fx))
+            if verbose >= 1: print("   Reduced last config g(x) from",res.gx0,"to",res.gx)
             traj0.milestones[-1] = res.x
             qlast = res.x
         t1 = time.time()
@@ -1273,7 +1288,7 @@ def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=
         xinit = trajcache.trajectoryToState(traj0)
         if verbose >= 1:
             objective = TrajectoryLengthObjective(trajcache)
-            print "Completed in time %g, objective value %g, now proceeding to main optimization"%(t1-t0,objective.value(xinit))
+            print("Completed in time %g, objective value %g, now proceeding to main optimization"%(t1-t0,objective.value(xinit)))
         #just return the initial trajectory
         if DEBUG_TRAJECTORY_INITIALIZATION:
             return traj0,[traj0],[[]]
@@ -1282,7 +1297,8 @@ def optimizeCollFreeTrajectory(trajcache,traj0,env,constraints=None,greedyStart=
     #proceed to main optimization
     xmin = np.hstack([qmin]*trajcache.numPoints)
     xmax = np.hstack([qmax]*trajcache.numPoints)
-    objective = TrajectoryLengthObjective(trajcache)
+    if objective is None:
+        objective = TrajectoryLengthObjective(trajcache)
     if constraints is None:
         if not hasattr(env,'__iter__'):
             env = [env]
