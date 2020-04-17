@@ -65,7 +65,7 @@ for c,(link,obj) in zip(constraints,pairs):
         if obj is obs:
             obstaclegeoms[i] = c.env
     linkgeoms[link.index] = c.robot.geometry[link.index]
-assert all(o is not None for o in linkgeoms),"Hm... couldn't find link geometries?"
+#assert all(o is not None for o in linkgeoms),"Hm... couldn't find link geometries?"
 assert all(o is not None for o in obstaclegeoms),"Hm... couldn't find obstacle geometries?"
 #this recreates the geometries too much
 #obstaclegeoms = [PenetrationDepthGeometry(obs.geometry(),gridres,pcres) for obs in obstacles]
