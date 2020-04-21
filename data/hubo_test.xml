@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<world>
+  <robot name="hubo" file="../Klampt-examples/data/robots/huboplus/huboplus_col.rob" /> 
+  <!--<robot name="hrp2" file="../Klampt-examples/data/robots/hrp2.rob" /> --> 
+  
+  <terrain file="../Klampt-examples/data/terrains/block.off" />
+
+  <rigidObject name="block1" file="../Klampt-examples/data/objects/block.obj"  position="0.5 0 0.7">
+  </rigidObject> 
+
+  <!-- this position is for the inner sphere test -->
+  <!-- <rigidObject name="block" file="../../../Klampt-examples/data/objects/block.obj"  position="-0.3 -0.4 0.25">
+  </rigidObject>  -->
+
+  <rigidObject name="chair" position="-0.1 -0.4 0" >
+  <geometry mesh="m797.off" rotateX="1.57" rotateZ="3.14159" scale="1" /> 
+  </rigidObject>  
+  <!-- this position is for the inner sphere test -->
+  <!--
+  <rigidObject name="chair" position="-0.0 -0.6 0" > 
+    <geometry mesh="../../PileSimulation/data/objects/psb_v1/db/7/m797/m797.off" rotateX="1.57" rotateZ="3.14159" scale="1" /> 
+  </rigidObject>
+  -->
+
+  <!--<rigidObject name="baby" position="0.3 0.25 0.8" >
+    <geometry mesh="../../PileSimulation/data/objects/psb_v1/db/2/m226/m226.off" rotateX="1.57" scale="1" /> 
+  </rigidObject>  -->
+
+</world>
