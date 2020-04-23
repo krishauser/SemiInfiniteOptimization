@@ -8,6 +8,7 @@ import scipy.sparse.linalg
 import scipy.io
 import heapq
 import random
+from klampt.math import vectorops
 from .objective import *
 from .constraint import *
 from . import utils
@@ -21,8 +22,8 @@ except ImportError:
 DEBUG_GRADIENTS = False
 DEBUG_TRAJECTORY_INITIALIZATION = False
 #whether to use a line search or trust region to control the step size
-#STEP_SIZE_METHOD = 'line search'
-STEP_SIZE_METHOD = 'trust region'
+STEP_SIZE_METHOD = 'line search'
+#STEP_SIZE_METHOD = 'trust region'
 #whether new constraints are detected during line search / trust region validation
 DETECT_NEW_COLLISIONS_IN_STEP = True
 #how are new constraints generated
@@ -68,6 +69,7 @@ class SemiInfiniteOptimizationSettings:
         #self.constraint_drop_value = float('inf')  #set this to infinity to never drop constraints
         self.minimum_constraint_value = -float('inf')
         self.initial_objective_score_weight = 1e-1
+        self.initial_penalty_parameter = 1e-1
         self.minimum_objective_score_weight = 1e-5
         self.parameter_exclusion_distance = 1e-3
         self.qp_solver_params = {'regularizationFactor':1e-3}
@@ -489,6 +491,7 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
     if settings is None:
         settings = SemiInfiniteOptimizationSettings()
     objScoreWeight = settings.initial_objective_score_weight
+    penalty_parameter = settings.initial_penalty_parameter
     res.fx0 = objective.value(x)
     res.gx0 = np.zeros(len(constraints))
     res.x = x
@@ -608,30 +611,33 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
                 print("   Predicted depths:",np.dot(rows,dx) + depths)
 
         if STEP_SIZE_METHOD == 'line search':
-            alpha = 1.0
-            if xmin is not None:
-                #limit alpha by bounds
-                for i in xrange(len(x)):
-                    if xmin[i] == xmax[i]:
-                        dx[i] = 0
-                    elif x[i] == xmax[i] and dx[i] > 0:
-                        #active set
-                        dx[i] = 0
-                    elif x[i] == xmin[i] and dx[i] < 0:
-                        #active set
-                        dx[i] = 0
-                    elif x[i] + alpha*dx[i] > xmax[i]:
-                        alpha = (xmax[i]-x[i])/dx[i]
-                        if alpha == 0:
-                            print("STOPPED ON UPPER BOUND",i,"dx =",dx[i])
-                    elif x[i] + alpha*dx[i] < xmin[i]:
-                        alpha = (xmin[i]-x[i])/dx[i]
-                        if alpha == 0:
-                            print("STOPPED ON LOWER BOUND",i,"dx =",dx[i])
             
-            xnext = objective.integrate(x,dx*alpha)
-            sorig = res.fx*objScoreWeight + scoring_metric2(depths)
+            H = objective.hessian(x)
+            if QP_SOLVE_METHOD == 'custom' or True:
+                weight = objScoreWeight*H
+            else:
+                weight = H
+            dx = cdata.solve_qp(W=weight,xdes=dxdes,A=rows,b=depths,xmin=dxmin,xmax=dxmax,verbose=verbose,**settings.qp_solver_params)
+            if np.isscalar(objective.hessian(x)):
+                df = - np.matmul(np.identity(len(dx)) * objective.hessian(x), objective.minstep(x))
+            else:
+                df = - np.matmul(np.diag(objective.hessian(x)), objective.minstep(x))
+            
+            c_penalty = scoring_metric2(depths)
+            
+            if c_penalty != 0:
+                penalty_parameter_tmp = vectorops.dot(df,dx)/((1 - 0.6) * c_penalty) #(1-rau)*penalty_parameter
+            if penalty_parameter_tmp > penalty_parameter:
+                penalty_parameter = penalty_parameter_tmp
+                
+            sorig = res.fx + penalty_parameter * c_penalty
             score_orig_trace.append(sorig)
+            
+            D = vectorops.dot(df, dx) - penalty_parameter * c_penalty
+            
+            alpha = 1.0
+            xnext = objective.integrate(x,dx*alpha)
+            
             if iters==0: 
                 gx_trace.append(res.gx0)
             if verbose >= 2: print("  Beginning line search at score",sorig,"... fx =",res.fx,", gx =",res.gx)
@@ -642,6 +648,7 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
             sfirst=None
             fxfirst=None
             gxfirst=None
+            
             while alpha >= alphaStall:
                 t1 = time.time()
                 fxnew = objective.value(xnext)
@@ -653,8 +660,8 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
                 if sfirst is None:
                     sfirst,fxfirst,gxfirst = snew,fxnew,gxnew
                 #print("   Alpha",alpha,"score",snew,"depths",res.gx)
-                if snew >= sorig or np.min(gxnew) < minimum_constraint_value:
-                    alpha *= 0.5
+                if snew >= sorig + 0.01 * alpha * D or np.min(gxnew) < minimum_constraint_value:
+                    alpha *= 0.6
                     xnext = objective.integrate(x,dx*alpha)
                 else:
                     #decrease in score
@@ -816,6 +823,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
     if settings is None:
         settings = SemiInfiniteOptimizationSettings()
     objScoreWeight = settings.initial_objective_score_weight
+    penalty_parameter = settings.initial_penalty_parameter
     res.fx0 = objective.value(x)
     res.gx0 = np.zeros(len(constraints))
     res.x = x
@@ -987,26 +995,36 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                 print("   Predicted depths:",np.dot(rows,dx) + depths)
 
         if STEP_SIZE_METHOD == 'line search':
+            
+            H = objective.hessian(x)
+            if QP_SOLVE_METHOD == 'custom' or True:
+                weight = objScoreWeight*H
+            else:
+                weight = H
+            dx = cdata.solve_qp(W=weight,xdes=dxdes,A=rows,b=depths,xmin=dxmin,xmax=dxmax,verbose=verbose,**settings.qp_solver_params)
+            
+            if np.isscalar(objective.hessian(x)):
+                df = - np.matmul(np.identity(len(dx)) * objective.hessian(x), objective.minstep(x))
+            
+            else:
+                df = - np.matmul(np.diag(objective.hessian(x)), objective.minstep(x))
+            
+            c_penalty = scoring_metric2(depths)
+
+            if c_penalty != 0:
+                penalty_parameter_tmp = vectorops.dot(df,dx)/((1 - 0.6) * c_penalty) #(1-rau)*penalty_parameter
+            else:
+                penalty_parameter_tmp = 0
+            if penalty_parameter_tmp > penalty_parameter:
+                penalty_parameter = penalty_parameter_tmp
+                        
+            sorig = res.fx + penalty_parameter * c_penalty
+            score_orig_trace.append(sorig)
+            
+            D = vectorops.dot(df, dx) - penalty_parameter * c_penalty
+
             alpha = 1.0
-            if xmin is not None:
-                #limit alpha by bounds
-                for i in xrange(len(x)):
-                    if xmin[i] == xmax[i]:
-                        dx[i] = 0
-                    elif x[i] == xmax[i] and dx[i] > 0:
-                        #active set
-                        dx[i] = 0
-                    elif x[i] == xmin[i] and dx[i] < 0:
-                        #active set
-                        dx[i] = 0
-                    elif x[i] + alpha*dx[i] > xmax[i]:
-                        alpha = (xmax[i]-x[i])/dx[i]
-                        if alpha == 0:
-                            print("STOPPED ON UPPER BOUND",i,"dx =",dx[i])
-                    elif x[i] + alpha*dx[i] < xmin[i]:
-                        alpha = (xmin[i]-x[i])/dx[i]
-                        if alpha == 0:
-                            print("STOPPED ON LOWER BOUND",i,"dx =",dx[i])
+            
             """
             #limit by extrapolations of other points
             if len(inside) < len(cdata.instantiated_params):
@@ -1015,10 +1033,10 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                         dpred = alpha*np.dot(rows[i],dx) + depths[i]
                         if dpred < 0:
                             alpha = -depths[i]/np.dot(rows[i],dx)
-                            if verbose>=2: print("Limiting alpha to",alpha,"Initial depth",depths[i],"pred depth",dpred
+                            if verbose>=2: print "Limiting alpha to",alpha,"Initial depth",depths[i],"pred depth",dpred
                             assert alpha >= 0 and alpha <= 1.0
                 if alpha < 1.0:
-                    if verbose>=1: print("Limited alpha to",alpha
+                    if verbose>=1: print "Limited alpha to",alpha
             """
             xnext = objective.integrate(x,dx*alpha)
             sorig = _score(res.fx,cdepths,objScoreWeight)
@@ -1027,6 +1045,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                 gx_trace.append(res.gx0)
             if verbose >= 2: print("  Beginning line search at score",sorig,"... fx =",res.fx,", gx =",res.gx)
             #Now do a line search to optimize the residuals for *all* constraints not just the active ones
+            dxnorm2 = np.dot(dx,dx)
             dxnorm = math.sqrt(dxnorm2)
             alphaStall = min(xepsilon / dxnorm,alpha)
             num_instantiations0 = sum(len(p) for p in cdata.instantiated_params)
@@ -1043,7 +1062,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                 if sfirst is None:
                     sfirst,fxfirst,gxfirst = snew,fxnew,gxnew
                 #print("   Alpha",alpha,"score",snew,"depths",res.gx
-                if snew >= sorig or np.min(gxnew) < minimum_constraint_value:
+                if snew >= sorig + 0.01 * alpha * D or np.min(gxnew) < minimum_constraint_value:
                     if DETECT_NEW_COLLISIONS_IN_STEP:
                         num_instantiations = sum(len(p) for p in cdata.instantiated_params)
                         if num_instantiations > num_instantiations0 and np.min(gxnew) < 0:
