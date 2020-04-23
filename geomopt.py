@@ -1,3 +1,4 @@
+from __future__ import print_function,division
 from klampt import *
 from klampt.math import vectorops,so3,se3
 from klampt.model.trajectory import Trajectory,SE3Trajectory
@@ -29,13 +30,13 @@ else:
         fn,obj = res
     else:
         exit(1)
-    print "Cloning object for second object"
+    print("Cloning object for second object")
     obj2 = obj.clone()
 
 if obj is None:
     exit(1)
 
-print "Input object has type",obj.type(),"with",obj.numElements(),"elements"
+print("Input object has type",obj.type(),"with",obj.numElements(),"elements")
 geom1 = PenetrationDepthGeometry(obj,gridres,pcres)
 geom2 = PenetrationDepthGeometry(obj2,gridres,pcres)
         
