@@ -1,3 +1,4 @@
+from __future__ import print_function,division
 from klampt import *
 from klampt.math import vectorops,so3,se3
 from klampt.model.trajectory import SE3Trajectory
@@ -34,7 +35,7 @@ else:
         exit(1)
 
 if world.numRobots() == 0:
-    print "Must specify a robot"
+    print("Must specify a robot")
     exit(1)
 
 robot = world.robot(0)
@@ -46,10 +47,10 @@ for i in xrange(world.numRigidObjects()):
     obstacles.append(world.rigidObject(i))
 #for i in xrange(world.numTerrains()):
 #   obstacles.append(world.terrain(i))
-print "%d robots, %d rigid objects, %d terrains"%(world.numRobots(),world.numRigidObjects(),world.numTerrains())
+print("%d robots, %d rigid objects, %d terrains"%(world.numRobots(),world.numRigidObjects(),world.numTerrains()))
 assert len(obstacles) > 0
 constraints,pairs = geometryopt.makeCollisionConstraints(robot,obstacles,gridres,pcres)
-print "Created",len(constraints),"constraints"
+print("Created",len(constraints),"constraints")
 
 vis.add("world",world)
 movableObjects = []
@@ -73,7 +74,7 @@ assert all(o is not None for o in obstaclegeoms),"Hm... couldn't find obstacle g
 if DUMP_SDF:
     for i in xrange(robot.numLinks()):
         fn = 'output/'+ robot.link(i).getName()+'.mat'
-        print "Saving SDF to",fn
+        print("Saving SDF to",fn)
         geometryopt.dump_grid_mat(linkgeoms[i].grid,fn)
 
 qinit = robot.getConfig()
@@ -146,7 +147,7 @@ while vis.shown():
     distances = [c.minvalue(qcollfree) for c in constraints]
     for c in constraints:
         c.clearx()
-    print "Distances",distances
+    print("Distances",distances)
     """
     for i in oldcps:
         vis.hide(i)
