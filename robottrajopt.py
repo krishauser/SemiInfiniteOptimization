@@ -39,9 +39,11 @@ if len(sys.argv) > 1:
     for fn in sys.argv[1:]:
         world.readFile(fn)
 else:
-    print("USAGE: python robottrajopt.py WORLD_MODEL")
-    print("Try python robottrajopt.py data/tx90_geom_test.xml")
-    exit(1)
+    res = resource.load('WorldModel')
+    if res is not None:
+        fn,world = res
+    else:
+        exit(1)
 
 if world.numRobots() == 0:
     print("Must specify a robot")
