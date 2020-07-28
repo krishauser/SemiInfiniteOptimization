@@ -1,18 +1,18 @@
 # SemiInfiniteOptimization
 
-### Kris Hauser
+### Kris Hauser, with contributor Mengchao Zheng
 
-### 10/30/2018
+### Latest update: 7/26/2020
 
-### kris.hauser@duke.edu
+### kkhauser@illinois.edu
 
 
 This package contains code accompanying the paper
-"[Semi-Infinite Programming for Trajectory Optimization with Nonconvex Obstacles](http://motion.pratt.duke.edu/papers/WAFR2018-Hauser-SemiInfinite.pdf)"
+"[Semi-Infinite Programming for Trajectory Optimization with Nonconvex Obstacles](http://motion.cs.illinois.edu/papers/WAFR2018-Hauser-SemiInfinite.pdf)"
 by K. Hauser, in Workshop on the Algorithmic Foundations of Robotics (WAFR), 2018.
 
 
-![Animation of live optimization of a trajectory with a tree obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_tree.gif) ![Animation of live optimization of a trajectory with a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/trajectory_chair.gif) ![Real-time optimization of a robot pose in the presence of a chair obstacle](http://motion.pratt.duke.edu/videos/wafr2018/moving_chair.gif)
+![Animation of live optimization of a trajectory with a tree obstacle](http://motion.cs.illinois.edu/videos/wafr2018/trajectory_tree.gif) ![Animation of live optimization of a trajectory with a chair obstacle](http://motion.cs.illinois.edu/videos/wafr2018/trajectory_chair.gif) ![Real-time optimization of a robot pose in the presence of a chair obstacle](http://motion.cs.illinois.edu/videos/wafr2018/moving_chair.gif)
 
 
 ## File structure
@@ -55,6 +55,7 @@ Copy the semiinfinite folder to your desired project, or create a setup.py to in
 site-packages, if you prefer.
 
 ```python
+from __future_ import print_function
 from klampt import *
 from semiinfinite.geometryopt import PenetrationDepthGeometry,optimizeCollFree
 from semiinfinite.sip import SemiInfiniteOptimizationSettings
@@ -76,7 +77,7 @@ geom2 = PenetrationDepthGeometry(obj2,gridres,pcres)
 
 # ... TODO: setup appropriate object transforms
 
-geom1.setTransform(obj1.getTransform())        
+geom1.setTransform(obj1.getTransform())
 geom2.setTransform(obj2.getTransform())
 
 # The optimizer will optimize the transform of object 1 with object 2 fixed.
@@ -92,7 +93,7 @@ Tcollfree,trace,cps = optimizeCollFree(geom1,geom2,Tinit,Tdes,verbose=0,settings
 # You may want to test the soluiton for collision.
 geom1.setTransform(Tcollfree)
 if geom1.distance(geom2) < 0:
-    print "Couldn't solve for a collision free configuration"
+    print("Couldn't solve for a collision free configuration")
 
 # If you want to update the Klamp't object, call this...
 obj1.setTransform(*Tcollfree)
@@ -130,3 +131,9 @@ folder is somewhere else, change the paths accordingly.
 
 In each of these demos, you can drag around the object transform and observe the results of the optimization.
 
+
+## Version history
+
+7/26/2020 - Updated for Python 2/3 compatibility, added line search guarantee (courtesy of Mengchao Zheng.)
+
+10/30/2018 - First release
