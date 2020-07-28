@@ -280,7 +280,7 @@ class RobotTrajectoryCache:
             for a in ancestors[l]:
                 self.lipschitzConstants[a,l] = radii[a,l] + Kgeom
             self.lipschitzConstants[l,l] = Kgeom
-        print("Robot lipschitz constants",self.lipschitzConstants)
+        #print("Robot lipschitz constants",self.lipschitzConstants)
         self.dirty = True
     def set(self,x):
         if self.dirty:
@@ -690,6 +690,13 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
         self.trajectory = trajectorycache
         self.verbose = 0
         self.epsilon = 1e-2
+        self.activeLinks = []
+        qmin,qmax = self.trajectory.robot.getJointLimits()
+        for i in xrange(self.trajectory.robot.numLinks()):
+            if qmin[i] < qmax[i]:
+                self.activeLinks.append(i)
+            else:
+                print("RobotTrajectoryCollisionConstraint: ignoring link",i)
     def setx(self,x):
         self.trajectory.set(x)
     def clearx(self):
@@ -726,7 +733,7 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
         tmin = None
         qmin = None
         active_milestones = [dict() for i in xrange(len(traj.milestones))]
-        for link in range(robot.numLinks())[::-1]:
+        for link in self.activeLinks[::-1]:
             geom = self.trajectory.kinematics.geometry[link]
             for i in xrange(len(traj.milestones)):
                 #self.trajectory.robot.setConfig(q)
@@ -926,15 +933,19 @@ class RobotTrajectoryCollisionConstraint(SemiInfiniteConstraintInterface):
         qs = []
         inds = []
         #dx = np.zeros(m*n)
-        if i >= 0:
+        if i >= 0 and i+1 <= m:
             #dx[i*n:i*n+n] = (1-u)*dq
             qs.append((1-u)*dq)
-            inds += range(i*n,i*n+n)
-        if i+1 < m:
+            inds += list(range(i*n,i*n+n))
+        if i >= 0 and i+1 < m:
             #dx[i*n+n:i*n+2*n] = u*dq
             qs.append(u*dq)
-            inds += range(i*n+n,i*n+2*n)
+            inds += list(range(i*n+n,i*n+2*n))
+        if len(qs) == 0:
+            return scipy.sparse.csr_matrix((qs,[],[0,0]),shape=(1,m*n))
         qs = np.hstack(qs)
+        for i in inds:
+            assert i >= 0 and i < m*n,"Failed to calculate proper df/dx for link %d, env %d, t %f"%(link,env,t)
         dx = scipy.sparse.csr_matrix((qs,inds,[0,len(inds)]),shape=(1,m*n))
         return dx
         
