@@ -22,8 +22,8 @@ except ImportError:
 DEBUG_GRADIENTS = False
 DEBUG_TRAJECTORY_INITIALIZATION = False
 #whether to use a line search or trust region to control the step size
-STEP_SIZE_METHOD = 'line search'
-#STEP_SIZE_METHOD = 'trust region'
+#STEP_SIZE_METHOD = 'line search'
+STEP_SIZE_METHOD = 'trust region'
 #whether new constraints are detected during line search / trust region validation
 DETECT_NEW_COLLISIONS_IN_STEP = True
 #how are new constraints generated
@@ -314,8 +314,8 @@ class ConstraintGenerationData:
             P = P + scipy.sparse.diags([regularizationFactor]*n,format='csc')
         #A = scipy.sparse.csc_matrix(np.array(A))
         #this fails sometimes?
-        #A = scipy.sparse.vstack(A,format='csc')
-        A = scipy.sparse.vstack([scipy.sparse.coo_matrix(v) for v in A],format='csc')
+        A = scipy.sparse.vstack(A,format='csc')
+        #A = scipy.sparse.vstack([scipy.sparse.coo_matrix(v) for v in A],format='csc')
         b = np.asarray(b)
         l = -b + np.ones(m)*self.constraint_inflation
         u = np.array([np.inf]*m)
@@ -611,17 +611,18 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
                 print("   Predicted depths:",np.dot(rows,dx) + depths)
 
         if STEP_SIZE_METHOD == 'line search':
-            
             H = objective.hessian(x)
             if QP_SOLVE_METHOD == 'custom' or True:
                 weight = objScoreWeight*H
             else:
                 weight = H
             dx = cdata.solve_qp(W=weight,xdes=dxdes,A=rows,b=depths,xmin=dxmin,xmax=dxmax,verbose=verbose,**settings.qp_solver_params)
-            if np.isscalar(objective.hessian(x)):
-                df = - np.matmul(np.identity(len(dx)) * objective.hessian(x), objective.minstep(x))
+            if np.isscalar(H):
+                df = - np.matmul(np.identity(len(dx)) * H, objective.minstep(x))
+            elif scipy.sparse.issparse(H):
+                df = -H.dot(objective.minstep(x))
             else:
-                df = - np.matmul(np.diag(objective.hessian(x)), objective.minstep(x))
+                df = - np.matmul(H, objective.minstep(x))
             
             c_penalty = scoring_metric2(depths)
             
@@ -674,9 +675,6 @@ def optimizeStandard(objective,constraints,xinit,xmin=None,xmax=None,settings=No
                 if objScoreWeight < xepsilon*10:
                     break
                 xnext = x
-            else:
-                #print("  Completed line search at alpha =",alpha,"residual",newResidual,"...",nextresiduals
-                if verbose>=2: print("  Completed line search at alpha =",alpha,"score",snew,"... fx = ",res.fx,", gx =",res.gx)
         else:
             assert STEP_SIZE_METHOD == 'trust region',"Can only do line search or trust region now"
             dxnorm = math.sqrt(dxnorm2)
@@ -992,7 +990,12 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
         if verbose >= 2:
             #test result
             if len(rows) > 0:
-                print("   Predicted depths:",np.dot(rows,dx) + depths)
+                try:
+                    print("   Predicted depths:",scipy.sparse.vstack(rows).dot(dx) + depths)
+                except Exception:
+                    print("Can't predict depths? rows",rows)
+                    print("Depths",depths)
+                    pass
 
         if STEP_SIZE_METHOD == 'line search':
             
@@ -1003,11 +1006,12 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                 weight = H
             dx = cdata.solve_qp(W=weight,xdes=dxdes,A=rows,b=depths,xmin=dxmin,xmax=dxmax,verbose=verbose,**settings.qp_solver_params)
             
-            if np.isscalar(objective.hessian(x)):
-                df = - np.matmul(np.identity(len(dx)) * objective.hessian(x), objective.minstep(x))
-            
+            if np.isscalar(H):
+                df = - np.matmul(np.identity(len(dx)) * H, objective.minstep(x))
+            elif scipy.sparse.issparse(H):
+                df = -H.dot(objective.minstep(x))
             else:
-                df = - np.matmul(np.diag(objective.hessian(x)), objective.minstep(x))
+                df = - np.matmul(H, objective.minstep(x))
             
             c_penalty = scoring_metric2(depths)
 
@@ -1018,7 +1022,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
             if penalty_parameter_tmp > penalty_parameter:
                 penalty_parameter = penalty_parameter_tmp
                         
-            sorig = res.fx + penalty_parameter * c_penalty
+            sorig = res.fx*objScoreWeight + penalty_parameter * c_penalty
             score_orig_trace.append(sorig)
             
             D = vectorops.dot(df, dx) - penalty_parameter * c_penalty
@@ -1039,8 +1043,8 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                     if verbose>=1: print "Limited alpha to",alpha
             """
             xnext = objective.integrate(x,dx*alpha)
-            sorig = _score(res.fx,cdepths,objScoreWeight)
-            score_orig_trace.append(sorig)
+            #sorig = _score(res.fx,cdepths,objScoreWeight)
+            #score_orig_trace.append(sorig)
             if iters==0: 
                 gx_trace.append(res.gx0)
             if verbose >= 2: print("  Beginning line search at score",sorig,"... fx =",res.fx,", gx =",res.gx)
@@ -1063,6 +1067,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                     sfirst,fxfirst,gxfirst = snew,fxnew,gxnew
                 #print("   Alpha",alpha,"score",snew,"depths",res.gx
                 if snew >= sorig + 0.01 * alpha * D or np.min(gxnew) < minimum_constraint_value:
+                    """
                     if DETECT_NEW_COLLISIONS_IN_STEP:
                         num_instantiations = sum(len(p) for p in cdata.instantiated_params)
                         if num_instantiations > num_instantiations0 and np.min(gxnew) < 0:
@@ -1085,14 +1090,34 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                                 raw_input()
                             update_oracle = False
                             break
+                    """
                     alpha *= 0.5
                     xnext = objective.integrate(x,dx*alpha)
                 else:
                     if DETECT_NEW_COLLISIONS_IN_STEP:
                         num_instantiations = sum(len(p) for p in cdata.instantiated_params)
                         if num_instantiations > num_instantiations0:
+                            #go back to the prior state and update the step direction
+                            xnext = x
+                            fxnew = res.fx
+                            gxnew = res.gx
+                            if verbose >= 2:
+                                print("  Detected new constraint parameter during line search on iter",iters,", re-solving...")
+                                for i,c in enumerate(constraints):
+                                    if len(cdata.instantiated_params[i]) > 0:
+                                        c.setx(xnext)
+                                        newcvalues = [c.value(xnext,y) for y in cdata.instantiated_params[i]]
+                                        c.clearx()
+                                        c.setx(x)
+                                        cvalues = [c.value(x,y) for y in cdata.instantiated_params[i]]
+                                        c.clearx()
+                                        print("  old constraint values",cvalues)
+                                        print("  new constraint values",newcvalues)
+                                raw_input()
                             update_oracle = False
                     #decrease in score
+                    if verbose>=1:
+                        print("  Completed line search at alpha =",alpha,"score",snew,"... fx = ",res.fx,", gx =",res.gx)
                     break
             if alpha < alphaStall:
                 if verbose>=1:
@@ -1103,7 +1128,7 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                     for i in range(15):
                         alpha = (i-5)*0.1
                         xnext = objective.integrate(x,dx*alpha)
-                        dpred = np.dot(rows,dx*alpha) + depths
+                        dpred = scipy.sparse.vstack(rows).dot(dx*alpha) + depths
                         dvals = []
                         for i,c in enumerate(constraints):
                             c.setx(xnext)
@@ -1115,9 +1140,6 @@ def optimizeSemiInfinite(objective,constraints,xinit,xmin=None,xmax=None,setting
                 if objScoreWeight < xepsilon*10:
                     break
                 xnext = x
-            else:
-                #print("  Completed line search at alpha =",alpha,"residual",newResidual,"...",nextresiduals)
-                if verbose>=2: print("  Completed line search at alpha =",alpha,"score",snew,"... fx = ",res.fx,", gx =",res.gx)
         else:
             assert STEP_SIZE_METHOD == 'trust region',"Can only do line search or trust region now"
             dxnorm = math.sqrt(dxnorm2)
