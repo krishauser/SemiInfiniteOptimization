@@ -24,12 +24,17 @@ by K. Hauser, in Workshop on the Algorithmic Foundations of Robotics (WAFR), 201
 ├── README.md                 This file
 ├── resources                 Path files for running the trajectory optimization example code
 |   └─── ...
+├── robotplanopt.py           A robot motion planning + trajectory optimization example program
 ├── robotposeopt.py           A robot pose - geometry collision optimization example program
-├── robottrajopt.py           A robot pose - geometry collision optimization example program
-└── semiinfinite/             The core Python module
-    ├── geometryopt.py        SIP code for collision-free constraints between geometries, for objects, robot poses, and robot trajectories.
-    ├── __init__.py           Tells Python that this is a module
-    └── sip.py                Generic semi-infinite programming code
+├── robottrajopt.py           A robot trajectory optimization example program
+├── semiinfinite/             The core Python module
+|   ├── geometryopt.py        SIP code for collision-free constraints between geometries, for objects, robot poses, and robot trajectories.
+|   ├── __init__.py           Tells Python that this is a module
+|   ├── objective.py          Generic objectives for optimization problems
+|   ├── planopt.py            Runs a hybrid sampling-based + trajectory optimization motion planner
+|   └── sip.py                Generic semi-infinite programming code
+└── utils
+    └─── SDF Plotting.ipynb   A helper to plot Signed Distance Functions dumped in .mat format (see flag DUMP_SDF=True)
 ```
 
 
@@ -52,7 +57,8 @@ This package requires
 ## Basic usage:
 
 Copy the semiinfinite folder to your desired project, or create a setup.py to install this into your Python
-site-packages, if you prefer.
+site-packages, if you prefer.  The following code optimizes the pose of a rigid objects so that it's collision free
+with respect to another object.
 
 ```python
 from __future_ import print_function
@@ -104,7 +110,13 @@ obj1.setTransform(*Tcollfree)
 
 ## Running demos
 
-Basic geometry - geometry collision testing:
+The example files in data/*.xml assume the Klampt-examples folder is one level up from this folder.  If your Klampt-examples
+folder is somewhere else, change the paths accordingly.
+
+In geomopt.py and robotposeopt.py, you can drag around the object transform and observe the results of the optimization.
+
+
+### Basic geometry - geometry collision testing
 
 > python geomopt.py data/cube.off
 
@@ -112,8 +124,7 @@ Basic geometry - geometry collision testing:
 
 > python geomopt.py data/cube.off data/scene2_1.pcd
 
-
-Robot pose optimization testing:
+### Robot pose optimization testing:
 
 > python robotposeopt.py data/tx90_geom_test.xml
 
@@ -122,18 +133,24 @@ Robot pose optimization testing:
 > python robotposeopt.py data/tx90_geom_test3.xml
 
 
-Trajectory optimization testing
+### Trajectory optimization testing
 
-> python robottrajopt.py data/tx90_geom_test3.xml
+> python robottrajopt.py data/tx90_geom_test2.xml
 
-The example files in data/*.xml assume the Klampt folder is two levels up from this folder.  If your Klampt
-folder is somewhere else, change the paths accordingly.
+This example uses resources/robottrajopt_initial.path as the initial path. If this file doesn't exist, you can create your own
+path by editing the configurations as prompted.
 
-In each of these demos, you can drag around the object transform and observe the results of the optimization.
+
+### Optimal motion planning testing
+
+> python robotplanopt.py data/tx90_geom_test2.xml
+
+This example asks you to define a start and goal configuration, and then you may choose to run various optimizing motion planners
+from the Actions menu.
 
 
 ## Version history
 
-7/26/2020 - Updated for Python 2/3 compatibility, added line search guarantee (courtesy of Mengchao Zheng.)
+7/26/2020 - Updated for Python 2/3 compatibility. Added motion planning examples.  Improved line search method, with better scoring function (courtesy of Mengchao Zheng.)  Fixed occasional crash in trajectory optimizer.
 
 10/30/2018 - First release
