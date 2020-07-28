@@ -128,13 +128,13 @@ def doHybridShortcutSBL(numTrials=1):
     return dotest('shortcut_hybrid_sbl',numTrials,plannerSettings=plannerSettings,maxTime=totalMaxTime,numRestarts=numRestarts,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(numRestarts*2),optimizationMaxIters=numRestarts*optimizationMaxIters)
 
 def doAllTests():
-    doRRTStar(numAllTrials)
+    oRRTStar(numAllTrials)
     doLazyRRGStar(numAllTrials)
     doRestartSBL(numAllTrials)
     doRestartShortcutSBL(numAllTrials)
     doHybridSBL(numAllTrials)
     doHybridLazyRRGStar(numAllTrials)
-    doShortcutHybridSBL(numAllTrials)
+    doHybridShortcutSBL(numAllTrials)
     print("*** All tests completed, saved to output/robotplanopt_* ***")
 
 
