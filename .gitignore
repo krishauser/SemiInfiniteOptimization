@@ -1,3 +1,7 @@
+#custom stuff
+output/robotplanopt*
+output/summary*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

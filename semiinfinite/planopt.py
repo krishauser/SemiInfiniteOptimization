@@ -37,6 +37,7 @@ def planOptimizedTrajectory(world,robot,target,maxTime=float('inf'),numRestarts=
         plannerSettings={'type':'sbl','shortcut':True},
         plannerMaxIters=3000,
         plannerMaxTime=10.0,
+        plannerContinueOnRestart=False,
         optimizationMaxIters=200,
         kinematicsCache=None,
         settings=None,
@@ -51,6 +52,7 @@ def planOptimizedTrajectory(world,robot,target,maxTime=float('inf'),numRestarts=
         plannerSettings (dict): a Klamp't planner settings dictionary
         plannerMaxIters (int): max number of iterations to perform each planner call
         plannerMaxTime (float): max time for each planner call
+        plannerContinueOnRestart (bool): if true, the planner doesn't get reset every restart
         optimizationMaxIters (int): max number of total optimization iterations
         kinematicsCache (RobotKinematicsCache, optional): modifies the kinematics cache.
         settings (SemiInfiniteOptimizationSettings, optional): modifies the optimizer setting
@@ -123,7 +125,7 @@ def planOptimizedTrajectory(world,robot,target,maxTime=float('inf'),numRestarts=
                 break
 
         #do sampling-based planningif bestPath is not None:
-        if restart == 0 or planner.getPath():
+        if restart == 0 or (not plannerContinueOnRestart and planner.getPath()):
             robot.setConfig(startConfig)
             planner = robotplanning.planToConfig(world,robot,target,**plannerSettings)
         t0 = time.time()
@@ -210,7 +212,12 @@ def planOptimizedTrajectory(world,robot,target,maxTime=float('inf'),numRestarts=
                     #write the whole trace
                     for i,(traji,ti) in enumerate(zip(traj_trace,traj_times)):
                         if i==0: continue
-                        logFile.write("%d,%d,%g,optimize,%g\n"%(restart,i,t0 + ti - tstart,min(bestPathCost,traji.length())))
+                        xtraj = trajCache.trajectoryToState(traji)
+                        constraint.setx(xtraj)
+                        residual = constraint.minvalue(xtraj)
+                        constraint.clearx()
+                        if residual[0] >= 0:
+                            logFile.write("%d,%d,%g,optimize,%g\n"%(restart,i,t0 + ti - tstart,min(bestPathCost,traji.length())))
                 xtraj = trajCache.trajectoryToState(traj)
                 #cost = obj.value(xtraj)
                 cost = traj.length()

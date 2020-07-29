@@ -115,25 +115,30 @@ def doRestartShortcutSBL(numTrials=1):
     plannerSettings={'type':'sbl','perturbationRadius':1.0,'bidirectional':True,'shortcut':True, 'optimizing':True,'movingSubset':movingSubset}
     return dotest('restart_shortcut_sbl',numTrials,plannerSettings=plannerSettings,numRestarts=numRestarts*2,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(numRestarts*2),optimizationMaxIters=0)
 
-def doHybridSBL(numTrials=1):
-    plannerSettings={'type':'sbl','perturbationRadius':1.0,'bidirectional':True,'movingSubset':movingSubset}
-    return dotest('hybrid_sbl',numTrials,plannerSettings=plannerSettings,maxTime=totalMaxTime,numRestarts=numRestarts,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(numRestarts*2),optimizationMaxIters=numRestarts*optimizationMaxIters)
+def doHybridRRTStar(numTrials=1):
+    plannerSettings={'type':'rrt*','optimizing':True,'movingSubset':movingSubset}
+    return dotest('hybrid_rrtstar',numTrials,plannerSettings=plannerSettings,maxTime=totalMaxTime,numRestarts=numRestarts,plannerContinueOnRestart=True,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(2*numRestarts),optimizationMaxIters=optimizationMaxIters*numRestarts)
 
 def doHybridLazyRRGStar(numTrials=1):
     plannerSettings={'type':'lazyrrg*','optimizing':True,'movingSubset':movingSubset}
-    return dotest('hybrid_lazyrrtstar',numTrials,plannerSettings=plannerSettings,maxTime=totalMaxTime,numRestarts=numRestarts,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(numRestarts*2),optimizationMaxIters=numRestarts*optimizationMaxIters)
+    return dotest('hybrid_lazyrrtstar',numTrials,plannerSettings=plannerSettings,maxTime=totalMaxTime,numRestarts=numRestarts,plannerContinueOnRestart=True,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(2*numRestarts),optimizationMaxIters=optimizationMaxIters*numRestarts)
+
+def doHybridSBL(numTrials=1):
+    plannerSettings={'type':'sbl','perturbationRadius':1.0,'bidirectional':True,'movingSubset':movingSubset}
+    return dotest('hybrid_sbl',numTrials,plannerSettings=plannerSettings,maxTime=totalMaxTime,numRestarts=numRestarts,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(numRestarts*2),optimizationMaxIters=numRestarts*optimizationMaxIters)
 
 def doHybridShortcutSBL(numTrials=1):
     plannerSettings={'type':'sbl','perturbationRadius':1.0,'bidirectional':True,'shortcut':True, 'optimizing':True,'movingSubset':movingSubset}
     return dotest('shortcut_hybrid_sbl',numTrials,plannerSettings=plannerSettings,maxTime=totalMaxTime,numRestarts=numRestarts,plannerMaxIters=200000,plannerMaxTime=totalMaxTime/(numRestarts*2),optimizationMaxIters=numRestarts*optimizationMaxIters)
 
 def doAllTests():
-    oRRTStar(numAllTrials)
+    doRRTStar(numAllTrials)
     doLazyRRGStar(numAllTrials)
     doRestartSBL(numAllTrials)
     doRestartShortcutSBL(numAllTrials)
-    doHybridSBL(numAllTrials)
+    doHybridRRTStar(numAllTrials)
     doHybridLazyRRGStar(numAllTrials)
+    doHybridSBL(numAllTrials)
     doHybridShortcutSBL(numAllTrials)
     print("*** All tests completed, saved to output/robotplanopt_* ***")
 
@@ -151,11 +156,12 @@ def runPlanner(runfunc,name):
         lastPlan = name
 
 vis.addAction(lambda: runPlanner(doRRTStar,"RRT*"),"Run RRT*")
+vis.addAction(lambda: runPlanner(doHybridRRTStar,"Hybrid RRT*"),"Run Hybrid RRT*")
 vis.addAction(lambda: runPlanner(doLazyRRGStar,"Lazy-RRG*"),"Run Lazy-RRG*")
-vis.addAction(lambda: runPlanner(doRestartSBL,"Restart SBL"),"Run Restart SBL")
-vis.addAction(lambda: runPlanner(doRestartShortcutSBL,"Restart-Shortcut SBL"),"Run Restart-Shortcut SBL")
-vis.addAction(lambda: runPlanner(doHybridSBL,"Hybrid SBL"),"Run Hybrid SBL")
 vis.addAction(lambda: runPlanner(doHybridLazyRRGStar,"Hybrid LazyRRG*"),"Run Hybrid LazyRRG*")
+vis.addAction(lambda: runPlanner(doRestartSBL,"Restart SBL"),"Run Restart SBL")
+vis.addAction(lambda: runPlanner(doHybridSBL,"Hybrid SBL"),"Run Hybrid SBL")
+vis.addAction(lambda: runPlanner(doRestartShortcutSBL,"Restart-Shortcut SBL"),"Run Restart-Shortcut SBL")
 vis.addAction(lambda: runPlanner(doHybridShortcutSBL,"Hybrid-Shortcut SBL"),"Run Hybrid-Shortcut SBL*")
 vis.addAction(doAllTests,"Run all tests")
 
